@@ -41,6 +41,7 @@ app.include_router(tasks.router)
 app.include_router(training.router)
 
 # Serve uploaded files
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/api/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Serve frontend — mount at root so paths like /css/app.css work

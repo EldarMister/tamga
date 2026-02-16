@@ -23,7 +23,7 @@ _load_env_file(os.path.join(BASE_DIR, ".env"))
 
 SECRET_KEY = os.getenv("POLYCONTROL_SECRET", "polycontrol-dev-secret-change-in-production")
 DB_PATH = os.getenv("POLYCONTROL_DB_PATH", os.path.join(BASE_DIR, "polycontrol.db"))
-DATABASE_URL = os.getenv("POLYCONTROL_DATABASE_URL", "").strip()
+DATABASE_URL = os.getenv("POLYCONTROL_DATABASE_URL", "").strip() or os.getenv("DATABASE_URL", "").strip()
 DB_ENGINE = "postgres" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "sqlite"
 JWT_EXPIRY_HOURS = 72
 UPLOAD_DIR = os.getenv("POLYCONTROL_UPLOAD_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads"))
