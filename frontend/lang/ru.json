@@ -1,0 +1,36 @@
+{
+    "app": { "title": "Тамга Сервис" },
+    "auth": { "login": "Войти", "username": "Имя пользователя", "password": "Пароль", "logout": "Выйти" },
+    "nav": { "orders": "Заказы", "inventory": "Склад", "profile": "Профиль", "hr": "Кадры", "more": "Ещё" },
+    "order": {
+        "status": {
+            "created": "Создан", "design": "Дизайн", "design_done": "Макет готов",
+            "production": "Печать", "printed": "Напечатано", "postprocess": "Постобработка",
+            "ready": "Готов", "closed": "Закрыт", "cancelled": "Отменён"
+        },
+        "new": "Новый заказ", "client": "Клиент", "phone": "Телефон",
+        "retail": "Розница", "dealer": "Дилер", "quantity": "Количество",
+        "total": "Итого", "deadline": "Срок", "cancel": "Отменить заказ",
+        "overdue": "Просрочен"
+    },
+    "inventory": {
+        "stock": "На складе", "reserved": "Зарезервировано", "available": "Доступно",
+        "low_stock": "Мало на складе", "receive": "Приход", "correction": "Корректировка"
+    },
+    "hr": {
+        "checkin": "Начать смену", "checkout": "Закончить смену",
+        "shift": "Моя смена", "today": "Сегодня на работе",
+        "incident": "Инцидент", "defect": "Брак", "late": "Опоздание", "complaint": "Жалоба"
+    },
+    "payroll": {
+        "base": "Оклад", "bonus": "Бонус", "deductions": "Вычеты",
+        "total": "Итого", "paid": "Выплачено", "unpaid": "Не оплачено",
+        "pay": "Выплатить", "week": "Неделя"
+    },
+    "common": {
+        "save": "Сохранить", "cancel": "Отмена", "delete": "Удалить",
+        "edit": "Изменить", "back": "Назад", "search": "Поиск",
+        "loading": "Загрузка...", "error": "Ошибка", "success": "Успешно",
+        "confirm": "Подтвердить", "yes": "Да", "no": "Нет"
+    }
+}

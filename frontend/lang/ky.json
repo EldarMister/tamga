@@ -1,0 +1,36 @@
+{
+    "app": { "title": "Тамга Сервис" },
+    "auth": { "login": "Кирүү", "username": "Колдонуучу аты", "password": "Сырсөз", "logout": "Чыгуу" },
+    "nav": { "orders": "Буйрутмалар", "inventory": "Кампа", "profile": "Профиль", "hr": "Кадрлар", "more": "Дагы" },
+    "order": {
+        "status": {
+            "created": "Түзүлдү", "design": "Дизайн", "design_done": "Макет даяр",
+            "production": "Басып чыгаруу", "printed": "Басылды", "postprocess": "Кайра иштетүү",
+            "ready": "Даяр", "closed": "Жабылды", "cancelled": "Жокко чыгарылды"
+        },
+        "new": "Жаңы буйрутма", "client": "Кардар", "phone": "Телефон",
+        "retail": "Чекене", "dealer": "Дилер", "quantity": "Саны",
+        "total": "Жыйынтыгы", "deadline": "Мөөнөт", "cancel": "Жокко чыгаруу",
+        "overdue": "Мөөнөтү өттү"
+    },
+    "inventory": {
+        "stock": "Кампада", "reserved": "Бронь", "available": "Жеткиликтүү",
+        "low_stock": "Кампада аз калды", "receive": "Кабыл алуу", "correction": "Оңдоо"
+    },
+    "hr": {
+        "checkin": "Сменаны баштоо", "checkout": "Сменаны бүтүрүү",
+        "shift": "Менин сменам", "today": "Бүгүн жумушта",
+        "incident": "Окуя", "defect": "Брак", "late": "Кечигүү", "complaint": "Даттануу"
+    },
+    "payroll": {
+        "base": "Айлык", "bonus": "Бонус", "deductions": "Айып",
+        "total": "Жыйынтыгы", "paid": "Төлөндү", "unpaid": "Төлөнгөн жок",
+        "pay": "Төлөө", "week": "Апта"
+    },
+    "common": {
+        "save": "Сактоо", "cancel": "Жокко чыгаруу", "delete": "Өчүрүү",
+        "edit": "Өзгөртүү", "back": "Артка", "search": "Издөө",
+        "loading": "Жүктөлүүдө...", "error": "Ката", "success": "Ийгиликтүү",
+        "confirm": "Ырастоо", "yes": "Ооба", "no": "Жок"
+    }
+}
