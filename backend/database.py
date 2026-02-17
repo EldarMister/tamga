@@ -129,6 +129,28 @@ def _normalize_sql(sql: str, engine: str) -> str:
     return normalized
 
 
+_pg_pool = None
+
+
+def _get_pg_pool():
+    global _pg_pool
+    if _pg_pool is None:
+        from psycopg2.pool import SimpleConnectionPool
+        _pg_pool = SimpleConnectionPool(2, 10, DATABASE_URL)
+    return _pg_pool
+
+
+class PooledDBCompat(DBCompat):
+    """DBCompat that returns connection to pool on close()."""
+
+    def __init__(self, conn, engine, pool):
+        super().__init__(conn, engine)
+        self._pool = pool
+
+    def close(self):
+        self._pool.putconn(self._conn)
+
+
 def get_db():
     if DB_ENGINE == "postgres":
         if not DATABASE_URL:
@@ -136,9 +158,10 @@ def get_db():
         if psycopg2 is None:
             raise RuntimeError("psycopg2 is not installed. Add psycopg2-binary to requirements")
 
-        conn = psycopg2.connect(DATABASE_URL)
+        pool = _get_pg_pool()
+        conn = pool.getconn()
         conn.autocommit = False
-        return DBCompat(conn, "postgres")
+        return PooledDBCompat(conn, "postgres", pool)
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -377,6 +400,19 @@ CREATE TABLE IF NOT EXISTS client_notifications (
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     sent_at       TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_assigned_designer ON orders(assigned_designer);
+CREATE INDEX IF NOT EXISTS idx_orders_assigned_master ON orders(assigned_master);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_history_order_id ON order_history(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_history_changed_by ON order_history(changed_by, created_at);
+CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON attendance(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_incidents_user_created ON incidents(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_material_ledger_material ON material_ledger(material_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_shift_task_logs_user_date ON shift_task_logs(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at DESC);
 """
 
 SHIFT_TASK_SEED = [

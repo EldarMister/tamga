@@ -54,50 +54,71 @@ async def _period_report(period_start: str, period_end: str):
     db = get_db()
     employees = db.execute("SELECT * FROM users WHERE is_active = 1 AND role != 'director' ORDER BY full_name").fetchall()
 
+    period_end_ts = period_end + " 23:59:59"
+
+    # Batch: attendance days
+    att_rows = db.execute(
+        "SELECT user_id, COUNT(*) as cnt FROM attendance WHERE date BETWEEN ? AND ? GROUP BY user_id",
+        (period_start, period_end),
+    ).fetchall()
+    att_map = {r["user_id"]: r["cnt"] for r in att_rows}
+
+    # Batch: order_history tasks (design_done for designers)
+    design_rows = db.execute(
+        "SELECT changed_by, COUNT(*) as cnt FROM order_history WHERE new_status = 'design_done' AND created_at BETWEEN ? AND ? GROUP BY changed_by",
+        (period_start, period_end_ts),
+    ).fetchall()
+    design_map = {r["changed_by"]: r["cnt"] for r in design_rows}
+
+    # Batch: order_history tasks (printed/ready for master/assistant)
+    prod_rows = db.execute(
+        "SELECT changed_by, COUNT(*) as cnt FROM order_history WHERE new_status IN ('printed', 'ready') AND created_at BETWEEN ? AND ? GROUP BY changed_by",
+        (period_start, period_end_ts),
+    ).fetchall()
+    prod_map = {r["changed_by"]: r["cnt"] for r in prod_rows}
+
+    # Batch: all order_history tasks (for manager)
+    all_hist_rows = db.execute(
+        "SELECT changed_by, COUNT(*) as cnt FROM order_history WHERE created_at BETWEEN ? AND ? GROUP BY changed_by",
+        (period_start, period_end_ts),
+    ).fetchall()
+    all_hist_map = {r["changed_by"]: r["cnt"] for r in all_hist_rows}
+
+    # Batch: incidents
+    all_incidents = db.execute(
+        "SELECT * FROM incidents WHERE created_at BETWEEN ? AND ?",
+        (period_start, period_end_ts),
+    ).fetchall()
+    incidents_by_user = {}
+    for i in all_incidents:
+        incidents_by_user.setdefault(i["user_id"], []).append(i)
+
+    # Batch: payroll
+    payroll_rows = db.execute(
+        "SELECT * FROM payroll WHERE week_start = ?",
+        (period_start,),
+    ).fetchall()
+    payroll_map = {r["user_id"]: r for r in payroll_rows}
+
     report = []
     for emp in employees:
-        days = db.execute(
-            "SELECT COUNT(*) FROM attendance WHERE user_id = ? AND date BETWEEN ? AND ?",
-            (emp["id"], period_start, period_end),
-        ).fetchone()[0]
-
+        uid = emp["id"]
         if emp["role"] == "designer":
-            tasks = db.execute(
-                """SELECT COUNT(*) FROM order_history
-                   WHERE changed_by = ? AND new_status = 'design_done'
-                   AND created_at BETWEEN ? AND ?""",
-                (emp["id"], period_start, period_end + " 23:59:59"),
-            ).fetchone()[0]
+            tasks = design_map.get(uid, 0)
         elif emp["role"] in ("master", "assistant"):
-            tasks = db.execute(
-                """SELECT COUNT(*) FROM order_history
-                   WHERE changed_by = ? AND new_status IN ('printed', 'ready')
-                   AND created_at BETWEEN ? AND ?""",
-                (emp["id"], period_start, period_end + " 23:59:59"),
-            ).fetchone()[0]
+            tasks = prod_map.get(uid, 0)
         else:
-            tasks = db.execute(
-                """SELECT COUNT(*) FROM order_history
-                   WHERE changed_by = ? AND created_at BETWEEN ? AND ?""",
-                (emp["id"], period_start, period_end + " 23:59:59"),
-            ).fetchone()[0]
+            tasks = all_hist_map.get(uid, 0)
 
-        incidents = db.execute(
-            "SELECT * FROM incidents WHERE user_id = ? AND created_at BETWEEN ? AND ?",
-            (emp["id"], period_start, period_end + " 23:59:59"),
-        ).fetchall()
-        penalties_total = sum((i["deduction_amount"] or 0) for i in incidents)
-
-        payroll = db.execute(
-            "SELECT * FROM payroll WHERE user_id = ? AND week_start = ?",
-            (emp["id"], period_start),
-        ).fetchone()
+        user_incidents = incidents_by_user.get(uid, [])
+        penalties_total = sum((i["deduction_amount"] or 0) for i in user_incidents)
+        payroll = payroll_map.get(uid)
 
         report.append({
             "employee": dict(emp),
-            "days_worked": days,
+            "days_worked": att_map.get(uid, 0),
             "tasks_done": tasks,
-            "incidents": [dict(i) for i in incidents],
+            "incidents": [dict(i) for i in user_incidents],
             "penalties_total": penalties_total,
             "payroll": dict(payroll) if payroll else None,
         })

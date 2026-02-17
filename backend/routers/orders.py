@@ -124,14 +124,21 @@ async def list_orders(
 
     count = db.execute(f"SELECT COUNT(*) FROM orders o WHERE {where}", params).fetchone()[0]
 
-    orders = []
-    for r in rows:
-        order = dict(r)
-        items = db.execute("SELECT oi.*, s.name_ru, s.unit FROM order_items oi JOIN services s ON s.id = oi.service_id WHERE oi.order_id = ?", (r["id"],)).fetchall()
-        order["items"] = [dict(i) for i in items]
-        if user["role"] not in ("director",):
-            order.pop("material_cost", None)
-        orders.append(order)
+    orders = [dict(r) for r in rows]
+    if orders:
+        order_ids = [o["id"] for o in orders]
+        placeholders = ",".join(["?"] * len(order_ids))
+        all_items = db.execute(
+            f"SELECT oi.*, s.name_ru, s.unit FROM order_items oi JOIN services s ON s.id = oi.service_id WHERE oi.order_id IN ({placeholders})",
+            order_ids,
+        ).fetchall()
+        items_by_order = {}
+        for item in all_items:
+            items_by_order.setdefault(item["order_id"], []).append(dict(item))
+        for order in orders:
+            order["items"] = items_by_order.get(order["id"], [])
+            if user["role"] not in ("director",):
+                order.pop("material_cost", None)
 
     db.close()
     return {"orders": orders, "total": count}

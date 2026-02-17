@@ -60,6 +60,21 @@ async def checkin(user=Depends(get_current_user)):
     return dict(row)
 
 
+@router.post("/checkout")
+async def checkout(user=Depends(get_current_user)):
+    db = get_db()
+    today = _today_iso()
+    existing = db.execute(
+        "SELECT * FROM attendance WHERE user_id = ? AND date = ?",
+        (user["id"], today),
+    ).fetchone()
+    if not existing:
+        db.close()
+        raise HTTPException(status_code=400, detail="Вы не начинали смену сегодня")
+    if existing["check_out"]:
+        db.close()
+        raise HTTPException(status_code=400, detail="Смена уже завершена")
+
     # Require shift checklist before checkout
     required = db.execute(
         "SELECT id, title FROM shift_tasks WHERE role = ? AND is_required = 1",
@@ -127,7 +142,8 @@ async def list_attendance(
         f"""SELECT a.*, u.full_name, u.role FROM attendance a
             JOIN users u ON u.id = a.user_id
             WHERE {where}
-            ORDER BY a.date DESC, a.check_in DESC""",
+            ORDER BY a.date DESC, a.check_in DESC
+            LIMIT 200""",
         params,
     ).fetchall()
     db.close()
@@ -376,7 +392,8 @@ async def list_incidents(
             JOIN users u ON u.id = i.user_id
             JOIN users c ON c.id = i.created_by
             WHERE {where}
-            ORDER BY i.created_at DESC""",
+            ORDER BY i.created_at DESC
+            LIMIT 200""",
         params,
     ).fetchall()
     db.close()

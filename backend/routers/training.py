@@ -23,21 +23,19 @@ class TrainingCreate(BaseModel):
 async def list_training(user=Depends(get_current_user)):
     db = get_db()
     rows = db.execute(
-        """SELECT tr.*, u.full_name as created_by_name
+        """SELECT tr.*, u.full_name as created_by_name,
+           COALESCE(tp.watched, 0) as watched
            FROM training tr
            JOIN users u ON u.id = tr.created_by
+           LEFT JOIN training_progress tp ON tp.training_id = tr.id AND tp.user_id = ?
            ORDER BY tr.created_at DESC""",
+        (user["id"],),
     ).fetchall()
 
     result = []
     for r in rows:
         item = dict(r)
-        # Get progress for current user
-        progress = db.execute(
-            "SELECT * FROM training_progress WHERE training_id = ? AND user_id = ?",
-            (r["id"], user["id"]),
-        ).fetchone()
-        item["watched"] = bool(progress and progress["watched"]) if progress else False
+        item["watched"] = bool(item["watched"])
         result.append(item)
 
     db.close()
@@ -124,14 +122,17 @@ async def training_progress(user=Depends(role_required("director", "manager"))):
     employees = db.execute("SELECT id, full_name, role FROM users WHERE is_active = 1 ORDER BY full_name").fetchall()
     trainings = db.execute("SELECT id, title, is_required FROM training ORDER BY created_at DESC").fetchall()
 
+    all_progress = db.execute(
+        "SELECT user_id, training_id, watched FROM training_progress WHERE watched = 1"
+    ).fetchall()
+    watched_by_user = {}
+    for p in all_progress:
+        watched_by_user.setdefault(p["user_id"], set()).add(p["training_id"])
+
+    total = len(trainings)
     result = []
     for emp in employees:
-        progress = db.execute(
-            "SELECT training_id, watched FROM training_progress WHERE user_id = ?", (emp["id"],)
-        ).fetchall()
-        watched_ids = {p["training_id"] for p in progress if p["watched"]}
-        total = len(trainings)
-        done = len(watched_ids)
+        done = len(watched_by_user.get(emp["id"], set()))
         result.append({
             "employee": dict(emp),
             "total": total,

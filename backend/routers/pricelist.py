@@ -15,7 +15,7 @@ class PriceUpdate(BaseModel):
 @router.get("")
 async def get_pricelist(user=Depends(get_current_user)):
     db = get_db()
-    rows = db.execute("SELECT * FROM services WHERE is_active = 1 ORDER BY id").fetchall()
+    rows = db.execute("SELECT * FROM services WHERE is_active = 1 ORDER BY id LIMIT 200").fetchall()
     db.close()
     result = []
     for r in rows:

@@ -182,30 +182,36 @@ async def employee_stats(date_from: str = "", date_to: str = "", user=Depends(ro
         params_hist.append(date_to + " 23:59:59")
     hist_where = " AND ".join(conditions_hist) if conditions_hist else "1=1"
 
+    # Batch: attendance days per user
+    att_rows = db.execute(
+        f"SELECT user_id, COUNT(*) as cnt FROM attendance WHERE {time_where} GROUP BY user_id",
+        params_base,
+    ).fetchall()
+    att_map = {r["user_id"]: r["cnt"] for r in att_rows}
+
+    # Batch: order_history tasks per user
+    hist_rows = db.execute(
+        f"SELECT changed_by, COUNT(*) as cnt FROM order_history WHERE {hist_where} GROUP BY changed_by",
+        params_hist,
+    ).fetchall()
+    hist_map = {r["changed_by"]: r["cnt"] for r in hist_rows}
+
+    # Batch: incidents per user
+    inc_rows = db.execute(
+        f"SELECT user_id, COUNT(*) as cnt FROM incidents WHERE {hist_where} GROUP BY user_id",
+        params_hist,
+    ).fetchall()
+    inc_map = {r["user_id"]: r["cnt"] for r in inc_rows}
+
     result = []
     for emp in employees:
-        days = db.execute(
-            f"SELECT COUNT(*) FROM attendance WHERE user_id = ? AND {time_where}",
-            [emp["id"]] + params_base,
-        ).fetchone()[0]
-
-        tasks = db.execute(
-            f"SELECT COUNT(*) FROM order_history WHERE changed_by = ? AND {hist_where}",
-            [emp["id"]] + params_hist,
-        ).fetchone()[0]
-
-        incidents_count = db.execute(
-            f"SELECT COUNT(*) FROM incidents WHERE user_id = ? AND {hist_where}",
-            [emp["id"]] + params_hist,
-        ).fetchone()[0]
-
         result.append({
             "id": emp["id"],
             "full_name": emp["full_name"],
             "role": emp["role"],
-            "days_worked": days,
-            "tasks_done": tasks,
-            "incidents": incidents_count,
+            "days_worked": att_map.get(emp["id"], 0),
+            "tasks_done": hist_map.get(emp["id"], 0),
+            "incidents": inc_map.get(emp["id"], 0),
         })
 
     db.close()

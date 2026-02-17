@@ -1,5 +1,6 @@
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -27,6 +28,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_request_time(request: Request, call_next):
+    if not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+    if duration > 0.5:
+        print(f"SLOW {request.method} {request.url.path} {duration:.3f}s")
+    response.headers["X-Response-Time"] = f"{duration:.3f}"
+    return response
+
 
 # API routers
 app.include_router(auth_router.router)

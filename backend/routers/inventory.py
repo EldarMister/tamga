@@ -16,7 +16,7 @@ async def get_inventory(user=Depends(get_current_user)):
     if user["role"] not in ("director", "manager", "master"):
         raise HTTPException(status_code=403, detail="Нет доступа")
     db = get_db()
-    rows = db.execute("SELECT * FROM materials ORDER BY id").fetchall()
+    rows = db.execute("SELECT * FROM materials ORDER BY id LIMIT 200").fetchall()
     db.close()
     result = []
     for r in rows:
