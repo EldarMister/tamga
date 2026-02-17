@@ -23,6 +23,11 @@ class UserUpdate(BaseModel):
     lang: str | None = None
 
 
+class SelfUpdate(BaseModel):
+    username: str | None = None
+    phone: str | None = None
+
+
 @router.get("")
 async def list_users(user=Depends(role_required("director", "manager"))):
     db = get_db()
@@ -126,3 +131,49 @@ async def update_my_lang(lang: str, user=Depends(get_current_user)):
     db.commit()
     db.close()
     return {"lang": lang}
+
+
+@router.patch("/me")
+async def update_me(data: SelfUpdate, user=Depends(get_current_user)):
+    if user["role"] != "director":
+        raise HTTPException(status_code=403, detail="Нет доступа")
+
+    updates = {}
+    if data.username is not None:
+        new_username = data.username.strip()
+        if not new_username:
+            raise HTTPException(status_code=400, detail="Логин пустой")
+        db = get_db()
+        existing = db.execute(
+            "SELECT id FROM users WHERE username = ? AND id != ?",
+            (new_username, user["id"]),
+        ).fetchone()
+        if existing:
+            db.close()
+            raise HTTPException(status_code=400, detail="Логин уже занят")
+        updates["username"] = new_username
+    if data.phone is not None:
+        updates["phone"] = data.phone.strip()
+
+    if not updates:
+        return {
+            "id": user["id"],
+            "username": user["username"],
+            "full_name": user["full_name"],
+            "role": user["role"],
+            "lang": user["lang"],
+            "phone": user["phone"],
+        }
+
+    if "db" not in locals():
+        db = get_db()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [user["id"]]
+    db.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
+    db.commit()
+    row = db.execute(
+        "SELECT id, username, full_name, role, phone, is_active, lang, created_at FROM users WHERE id = ?",
+        (user["id"],),
+    ).fetchone()
+    db.close()
+    return dict(row)

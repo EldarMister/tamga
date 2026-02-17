@@ -11,6 +11,7 @@ function tr(ru, ky) {
 
 export async function render(container) {
     const user = state.user;
+    const isDirector = user.role === 'director';
 
     container.innerHTML = `
         <div class="page-header">
@@ -24,8 +25,13 @@ export async function render(container) {
                 </div>
                 <div class="font-bold text-xl">${user.full_name}</div>
                 <div class="text-gray-500">${roleLabel(user.role)}</div>
+                <div class="text-gray-400 mt-1">${user.username}</div>
                 ${user.phone ? `<div class="text-gray-400 mt-1">${user.phone}</div>` : ''}
             </div>
+
+            ${isDirector ? `
+                <button class="btn btn-secondary btn-block" id="edit-profile-btn">${tr('Редактировать профиль', 'Профилди оңдоо')}</button>
+            ` : ''}
 
             <div class="card">
                 <h3 class="text-sm font-bold text-gray-400 uppercase mb-3">${tr('Язык / Тил', 'Тил / Язык')}</h3>
@@ -47,6 +53,31 @@ export async function render(container) {
     document.getElementById('lessons-btn').onclick = () => {
         window.location.hash = '#/training';
     };
+
+    if (isDirector) {
+        document.getElementById('edit-profile-btn').onclick = () => {
+            showFormModal({
+                title: tr('Редактировать профиль', 'Профилди оңдоо'),
+                fields: [
+                    { name: 'username', label: tr('Логин', 'Колдонуучу'), type: 'text', required: true, value: user.username },
+                    { name: 'phone', label: tr('Телефон', 'Телефон'), type: 'text', required: false, value: user.phone || '' },
+                ],
+                submitText: tr('Сохранить', 'Сактоо'),
+                onSubmit: async (data) => {
+                    try {
+                        const updated = await api.patch('/api/users/me', data);
+                        if (updated) {
+                            state.user.username = updated.username;
+                            state.user.phone = updated.phone;
+                            localStorage.setItem('pc_user', JSON.stringify(state.user));
+                        }
+                        showToast(tr('Профиль обновлён', 'Профиль жаңырды'), 'success');
+                        render(container);
+                    } catch { /* handled */ }
+                },
+            });
+        };
+    }
 
     document.getElementById('change-pass-btn').onclick = () => {
         showFormModal({

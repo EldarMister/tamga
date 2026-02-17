@@ -23,6 +23,18 @@ class ShiftTaskUpdate(BaseModel):
     completed: bool = True
 
 
+class ShiftTaskCreate(BaseModel):
+    role: str
+    title: str
+    is_required: bool = True
+
+
+class ShiftTaskDefUpdate(BaseModel):
+    role: str | None = None
+    title: str | None = None
+    is_required: bool | None = None
+
+
 def _today_iso() -> str:
     return date.today().isoformat()
 
@@ -172,6 +184,115 @@ async def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(
     db.commit()
     db.close()
     return {"ok": True}
+
+
+@router.get("/shift-tasks/catalog")
+async def list_shift_task_defs(role: str = "", user=Depends(role_required("director"))):
+    # Director-only: manage checklist definitions
+    db = get_db()
+    conditions = ["1=1"]
+    params = []
+    if role:
+        conditions.append("role = ?")
+        params.append(role)
+    where = " AND ".join(conditions)
+    rows = db.execute(
+        f"SELECT * FROM shift_tasks WHERE {where} ORDER BY role, id",
+        params,
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+@router.post("/shift-tasks")
+async def create_shift_task(data: ShiftTaskCreate, user=Depends(role_required("director"))):
+    if not data.title.strip():
+        raise HTTPException(status_code=400, detail="Название задачи пустое")
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO shift_tasks (role, title, is_required) VALUES (?, ?, ?)",
+        (data.role, data.title.strip(), 1 if data.is_required else 0),
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (cur.lastrowid,)).fetchone()
+    db.close()
+    return dict(row)
+
+
+@router.patch("/shift-tasks/{task_id}")
+async def update_shift_task(task_id: int, data: ShiftTaskDefUpdate, user=Depends(role_required("director"))):
+    db = get_db()
+    row = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (task_id,)).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+
+    updates = {}
+    if data.role is not None:
+        updates["role"] = data.role
+    if data.title is not None:
+        updates["title"] = data.title.strip()
+    if data.is_required is not None:
+        updates["is_required"] = 1 if data.is_required else 0
+
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [task_id]
+        db.execute(f"UPDATE shift_tasks SET {set_clause} WHERE id = ?", values)
+        db.commit()
+
+    updated = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (task_id,)).fetchone()
+    db.close()
+    return dict(updated)
+
+
+@router.delete("/shift-tasks/{task_id}")
+async def delete_shift_task(task_id: int, user=Depends(role_required("director"))):
+    db = get_db()
+    db.execute("DELETE FROM shift_tasks WHERE id = ?", (task_id,))
+    db.commit()
+    db.close()
+    return {"ok": True}
+
+
+@router.get("/shift-tasks/report")
+async def shift_tasks_report(date: str = "", role: str = "", user=Depends(role_required("director"))):
+    # Director-only: view completion by user
+    db = get_db()
+    target_date = date or _today_iso()
+    if not role:
+        db.close()
+        raise HTTPException(status_code=400, detail="Нужна роль")
+
+    tasks = db.execute(
+        "SELECT id, title, is_required FROM shift_tasks WHERE role = ? ORDER BY id",
+        (role,),
+    ).fetchall()
+    users = db.execute(
+        "SELECT id, full_name FROM users WHERE role = ? AND is_active = 1 ORDER BY full_name",
+        (role,),
+    ).fetchall()
+    logs = db.execute(
+        "SELECT user_id, task_id, completed FROM shift_task_logs WHERE date = ?",
+        (target_date,),
+    ).fetchall()
+
+    log_map = {(l["user_id"], l["task_id"]): l["completed"] for l in logs}
+    result = []
+    for u in users:
+        entries = []
+        for t in tasks:
+            completed = bool(log_map.get((u["id"], t["id"]), 0))
+            entries.append({
+                "id": t["id"],
+                "title": t["title"],
+                "is_required": t["is_required"],
+                "completed": completed,
+            })
+        result.append({"user_id": u["id"], "full_name": u["full_name"], "tasks": entries})
+
+    db.close()
+    return {"date": target_date, "role": role, "items": result, "tasks": [dict(t) for t in tasks]}
 
 
 @router.get("/my-attendance")

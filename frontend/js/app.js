@@ -19,6 +19,7 @@ const pages = {
     '/reports': () => import('./pages/reports.js'),
     '/fines': () => import('./pages/fines.js'),
     '/announcements': () => import('./pages/announcements.js'),
+    '/shift-checklist': () => import('./pages/shift-checklist.js'),
     '/profile': () => import('./pages/profile.js'),
     '/more': () => import('./pages/more.js'),
     '/tasks': () => import('./pages/tasks.js'),
