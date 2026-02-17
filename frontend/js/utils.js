@@ -36,8 +36,8 @@ export function statusLabel(status) {
     const labelsRu = {
         created: 'Создан',
         design: 'Дизайн',
+        production: 'Производство',
         design_done: 'Макет готов',
-        production: 'Печать',
         printed: 'Напечатано',
         postprocess: 'Постобработка',
         ready: 'Готов',
@@ -47,8 +47,8 @@ export function statusLabel(status) {
     const labelsKy = {
         created: 'Түзүлдү',
         design: 'Дизайн',
+        production: 'Өндүрүш',
         design_done: 'Макет даяр',
-        production: 'Басуу',
         printed: 'Басылды',
         postprocess: 'Кийинки иштетүү',
         ready: 'Даяр',

@@ -1,4 +1,4 @@
-import { state, clearState } from './state.js';
+﻿import { state, clearState } from './state.js';
 import { showToast } from './components/toast.js';
 
 const BASE = '';
@@ -21,7 +21,8 @@ async function request(method, path, body = null) {
         }
         const data = await res.json();
         if (!res.ok) {
-            const msg = data.detail || 'Ошибка сервера';
+            let msg = data.detail || 'Ошибка сервера';
+            if (typeof msg === 'object' && msg.message) msg = msg.message;
             showToast(msg, 'error');
             throw new Error(msg);
         }

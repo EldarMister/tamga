@@ -1,6 +1,8 @@
-import { state, loadState } from './state.js';
+﻿import { state, loadState } from './state.js';
 import { loadTranslations } from './i18n.js';
 import { renderTabBar } from './components/tab-bar.js';
+import { api } from './api.js';
+import { showToast } from './components/toast.js';
 
 // Page modules
 const pages = {
@@ -16,6 +18,7 @@ const pages = {
     '/users': () => import('./pages/users.js'),
     '/reports': () => import('./pages/reports.js'),
     '/fines': () => import('./pages/fines.js'),
+    '/announcements': () => import('./pages/announcements.js'),
     '/profile': () => import('./pages/profile.js'),
     '/more': () => import('./pages/more.js'),
     '/tasks': () => import('./pages/tasks.js'),
@@ -65,6 +68,7 @@ async function navigate() {
         app.classList.add('page-enter');
         await mod.render(app, params);
         setTimeout(() => app.classList.remove('page-enter'), 400);
+        checkAnnouncements();
     } catch (err) {
         console.error('Page load error:', err);
         app.innerHTML = `<div style="text-align: center; padding: 64px; color: var(--danger);">Ошибка загрузки страницы</div>`;
@@ -110,6 +114,22 @@ window.toggleTheme = function() {
     }
     syncGlobalThemeToggle();
 };
+
+let lastAnnCheck = 0;
+async function checkAnnouncements() {
+    if (!state.token) return;
+    const now = Date.now();
+    if (now - lastAnnCheck < 30000) return;
+    lastAnnCheck = now;
+
+    try {
+        const list = await api.get('/api/announcements?unread=1');
+        if (!list || list.length === 0) return;
+        const latest = list[0];
+        showToast(latest.message, 'success');
+        await api.post(`/api/announcements/${latest.id}/read`, {});
+    } catch { /* handled */ }
+}
 
 // Init
 async function init() {

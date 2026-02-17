@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+﻿import { api } from '../api.js';
 import { state } from '../state.js';
 import { formatCurrency, formatDate, formatDateTime, statusBadgeClass, statusLabel, roleLabel, isOverdue } from '../utils.js';
 import { showToast } from '../components/toast.js';
@@ -6,13 +6,19 @@ import { showModal } from '../components/modal.js';
 
 const NEXT_STATUS = {
     created: { label: 'Передать в дизайн', status: 'design', roles: ['manager', 'director'] },
-    design: { label: 'Макет готов', status: 'design_done', roles: ['designer', 'manager', 'director'] },
-    design_done: { label: 'Отправить в печать', status: 'production', roles: ['manager', 'director', 'master'] },
-    production: { label: 'Напечатано', status: 'printed', roles: ['master', 'manager', 'director'] },
-    printed: { label: 'На постобработку', status: 'postprocess', roles: ['manager', 'director', 'master'] },
-    postprocess: { label: 'Готов к выдаче', status: 'ready', roles: ['assistant', 'manager', 'director'] },
+    design: { label: 'В производство', status: 'production', roles: ['designer', 'manager', 'director'] },
+    production: { label: 'Готов к выдаче', status: 'ready', roles: ['master', 'manager', 'director'] },
     ready: { label: 'Выдан клиенту', status: 'closed', roles: ['manager', 'director'] },
+    design_done: { label: 'В производство', status: 'production', roles: ['manager', 'director', 'master'] },
+    printed: { label: 'Готов к выдаче', status: 'ready', roles: ['manager', 'director'] },
+    postprocess: { label: 'Готов к выдаче', status: 'ready', roles: ['assistant', 'manager', 'director'] },
 };
+
+function isAreaUnit(unit) {
+    if (!unit) return false;
+    const u = unit.toLowerCase().replace(/\s+/g, '');
+    return u.includes('м2') || u.includes('м²') || u.includes('m2') || u.includes('m²');
+}
 
 export async function render(container, params) {
     const orderId = params.id;
@@ -33,18 +39,18 @@ function renderOrder(container, order) {
     const canAdvance = next && next.roles.includes(state.user.role);
     const canCancel = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled'].includes(order.status);
     const canUploadDesign = ['designer', 'manager', 'director'].includes(state.user.role) && ['design', 'created'].includes(order.status);
+    const canNotify = ['manager', 'director'].includes(state.user.role) && order.status === 'ready';
 
-    const item = order.items?.[0] || {};
+    const items = Array.isArray(order.items) ? order.items : [];
 
     container.innerHTML = `
         <div class="page-header">
-            <button class="btn btn-sm btn-secondary" id="back-btn">← Назад</button>
+            <button class="btn btn-sm btn-secondary" id="back-btn">\u2190 Назад</button>
             <h1 class="text-lg font-bold">${order.order_number}</h1>
             <div></div>
         </div>
 
         <div class="px-4 space-y-4 pb-8">
-            <!-- Status -->
             <div class="card">
                 <div class="flex items-center justify-between">
                     <span class="${statusBadgeClass(order.status)} text-base px-4 py-2">${statusLabel(order.status)}</span>
@@ -52,12 +58,16 @@ function renderOrder(container, order) {
                 </div>
                 ${canAdvance ? `
                     <button class="btn btn-success btn-block btn-lg mt-4" id="advance-btn">
-                        ${next.label} →
+                        ${next.label} \u2192
+                    </button>
+                ` : ''}
+                ${canNotify ? `
+                    <button class="btn btn-primary btn-block btn-lg mt-3" id="notify-btn">
+                        Отправить уведомление клиенту
                     </button>
                 ` : ''}
             </div>
 
-            <!-- Client -->
             <div class="card">
                 <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Клиент</h3>
                 <div class="font-bold text-lg">${order.client_name}</div>
@@ -67,24 +77,50 @@ function renderOrder(container, order) {
                 </span>
             </div>
 
-            <!-- Service details -->
-            <div class="card">
-                <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Услуга</h3>
-                <div class="font-medium">${item.name_ru || '—'}</div>
-                <div class="grid grid-cols-3 gap-4 mt-3">
-                    <div>
-                        <div class="text-xs text-gray-400">Кол-во</div>
-                        <div class="font-bold">${item.quantity || '—'} ${item.unit || ''}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">Цена/ед</div>
-                        <div class="font-bold">${formatCurrency(item.unit_price)}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-gray-400">Итого</div>
-                        <div class="font-bold text-blue-800 text-lg">${formatCurrency(order.total_price)}</div>
-                    </div>
+            ${order.photo_file ? `
+                <div class="card">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Фото заказа</h3>
+                    <img src="/api/uploads/${order.photo_file}" class="order-photo" alt="Фото заказа">
                 </div>
+            ` : ''}
+
+            <div class="card">
+                <h3 class="text-sm font-bold text-gray-400 uppercase mb-3">Услуги</h3>
+                <div class="order-items-wrap">
+                    <table class="order-items-table">
+                        <thead>
+                            <tr>
+                                <th>Услуга</th>
+                                <th>Ширина</th>
+                                <th>Высота</th>
+                                <th>Кол-во</th>
+                                <th>Цена</th>
+                                <th>Итог</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map(i => {
+                                const area = isAreaUnit(i.unit);
+                                return `
+                                    <tr>
+                                        <td>${i.name_ru || ''}</td>
+                                        <td>${area ? (i.width || '—') : '—'}</td>
+                                        <td>${area ? (i.height || '—') : '—'}</td>
+                                        <td>${i.quantity} ${i.unit || ''}</td>
+                                        <td>${formatCurrency(i.unit_price)}</td>
+                                        <td>${formatCurrency(i.total)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex items-center justify-between">
+                    <span class="text-gray-500">Итого по заказу</span>
+                    <span class="font-bold text-lg">${formatCurrency(order.total_price)}</span>
+                </div>
+
                 ${state.user.role === 'director' ? `
                     <div class="mt-3 pt-3 border-t">
                         <div class="grid grid-cols-2 gap-4">
@@ -101,13 +137,12 @@ function renderOrder(container, order) {
                 ` : ''}
             </div>
 
-            <!-- Design file -->
             ${order.design_file || canUploadDesign ? `
                 <div class="card">
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Макет</h3>
                     ${order.design_file ? `
                         <a href="/api/uploads/${order.design_file}" target="_blank" class="btn btn-outline btn-sm">
-                            📎 ${order.design_file}
+                            \uD83D\uDCCE ${order.design_file}
                         </a>
                     ` : '<p class="text-gray-400">Макет не загружен</p>'}
                     ${canUploadDesign ? `
@@ -119,7 +154,6 @@ function renderOrder(container, order) {
                 </div>
             ` : ''}
 
-            <!-- Info -->
             <div class="card">
                 <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Информация</h3>
                 <div class="space-y-2 text-sm">
@@ -129,7 +163,6 @@ function renderOrder(container, order) {
                 </div>
             </div>
 
-            <!-- History -->
             <div class="card">
                 <h3 class="text-sm font-bold text-gray-400 uppercase mb-3">История</h3>
                 <div class="space-y-3">
@@ -137,22 +170,20 @@ function renderOrder(container, order) {
                         <div class="flex gap-3 text-sm">
                             <div class="w-2 h-2 rounded-full bg-blue-400 mt-2 flex-shrink-0"></div>
                             <div>
-                                <div class="font-medium">${h.note || `${statusLabel(h.old_status || '')} → ${statusLabel(h.new_status)}`}</div>
-                                <div class="text-gray-400">${h.full_name} • ${formatDateTime(h.created_at)}</div>
+                                <div class="font-medium">${h.note || `${statusLabel(h.old_status || '')} \u2192 ${statusLabel(h.new_status)}`}</div>
+                                <div class="text-gray-400">${h.full_name} \u2022 ${formatDateTime(h.created_at)}</div>
                             </div>
                         </div>
                     `).join('')}
                 </div>
             </div>
 
-            <!-- Cancel -->
             ${canCancel ? `
                 <button class="btn btn-danger btn-block" id="cancel-btn">Отменить заказ</button>
             ` : ''}
         </div>
     `;
 
-    // Event handlers
     document.getElementById('back-btn').onclick = () => { window.location.hash = '#/orders'; };
 
     if (canAdvance) {
@@ -168,6 +199,16 @@ function renderOrder(container, order) {
                     } catch { /* handled */ }
                 },
             });
+        };
+    }
+
+    if (canNotify) {
+        const notifyBtn = document.getElementById('notify-btn');
+        notifyBtn.onclick = async () => {
+            try {
+                await api.post(`/api/orders/${order.id}/notify`, {});
+                showToast('Уведомление поставлено в очередь', 'success');
+            } catch { /* handled */ }
         };
     }
 

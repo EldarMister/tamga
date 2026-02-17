@@ -217,6 +217,7 @@ CREATE TABLE IF NOT EXISTS orders (
     material_cost       REAL    NOT NULL DEFAULT 0,
     notes               TEXT,
     design_file         TEXT,
+    photo_file          TEXT,
     assigned_designer   INTEGER REFERENCES users(id),
     assigned_master     INTEGER REFERENCES users(id),
     assigned_assistant  INTEGER REFERENCES users(id),
@@ -232,6 +233,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     service_id      INTEGER NOT NULL REFERENCES services(id),
     material_id     INTEGER REFERENCES materials(id),
     quantity        REAL    NOT NULL,
+    width           REAL,
+    height          REAL,
     unit_price      REAL    NOT NULL,
     total           REAL    NOT NULL,
     material_qty    REAL    NOT NULL DEFAULT 0,
@@ -332,7 +335,62 @@ CREATE TABLE IF NOT EXISTS training_progress (
     watched_at    TEXT,
     UNIQUE(training_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS shift_tasks (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    role          TEXT    NOT NULL,
+    title         TEXT    NOT NULL,
+    is_required   INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS shift_task_logs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    task_id       INTEGER NOT NULL REFERENCES shift_tasks(id),
+    date          TEXT    NOT NULL DEFAULT (date('now')),
+    completed     INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(user_id, task_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS announcements (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    message       TEXT    NOT NULL,
+    target_user_id INTEGER REFERENCES users(id),
+    created_by    INTEGER NOT NULL REFERENCES users(id),
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS announcement_reads (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    announcement_id INTEGER NOT NULL REFERENCES announcements(id),
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    read_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(announcement_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS client_notifications (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id      INTEGER NOT NULL REFERENCES orders(id),
+    channel       TEXT    NOT NULL,
+    message       TEXT    NOT NULL,
+    status        TEXT    NOT NULL DEFAULT 'queued',
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    sent_at       TEXT
+);
 """
+
+SHIFT_TASK_SEED = [
+    ("master", "Выключил оборудование", 1),
+    ("master", "Убрал рабочее место", 1),
+    ("master", "Сложил материалы", 1),
+    ("master", "Проверил печать", 1),
+    ("designer", "Сохранил файлы", 1),
+    ("designer", "Передал макеты", 1),
+    ("designer", "Закрыл задачи", 1),
+    ("manager", "Проверил заказы", 1),
+    ("manager", "Уведомил клиентов", 1),
+    ("manager", "Закрыл смену", 1),
+]
 
 
 def _sqlite_to_postgres_schema(sql: str) -> str:
@@ -359,6 +417,24 @@ def _init_sqlite(conn):
     if "photo_file" not in training_cols:
         cur.execute("ALTER TABLE training ADD COLUMN photo_file TEXT")
 
+    order_cols = {r[1] for r in cur.execute("PRAGMA table_info(orders)").fetchall()}
+    if "photo_file" not in order_cols:
+        cur.execute("ALTER TABLE orders ADD COLUMN photo_file TEXT")
+
+    order_item_cols = {r[1] for r in cur.execute("PRAGMA table_info(order_items)").fetchall()}
+    if "width" not in order_item_cols:
+        cur.execute("ALTER TABLE order_items ADD COLUMN width REAL")
+    if "height" not in order_item_cols:
+        cur.execute("ALTER TABLE order_items ADD COLUMN height REAL")
+
+    shift_count = cur.execute("SELECT COUNT(*) FROM shift_tasks").fetchone()[0]
+    if shift_count == 0:
+        for role, title, required in SHIFT_TASK_SEED:
+            cur.execute(
+                "INSERT INTO shift_tasks (role, title, is_required) VALUES (?, ?, ?)",
+                (role, title, required),
+            )
+
     conn.commit()
 
 
@@ -377,6 +453,33 @@ def _init_postgres(conn):
         cur.execute("ALTER TABLE training ADD COLUMN photo_url TEXT")
     if "photo_file" not in training_cols:
         cur.execute("ALTER TABLE training ADD COLUMN photo_file TEXT")
+
+    cur.execute(
+        """SELECT column_name FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'orders'"""
+    )
+    order_cols = {r[0] for r in cur.fetchall()}
+    if "photo_file" not in order_cols:
+        cur.execute("ALTER TABLE orders ADD COLUMN photo_file TEXT")
+
+    cur.execute(
+        """SELECT column_name FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'order_items'"""
+    )
+    order_item_cols = {r[0] for r in cur.fetchall()}
+    if "width" not in order_item_cols:
+        cur.execute("ALTER TABLE order_items ADD COLUMN width REAL")
+    if "height" not in order_item_cols:
+        cur.execute("ALTER TABLE order_items ADD COLUMN height REAL")
+
+    cur.execute("SELECT COUNT(*) FROM shift_tasks")
+    shift_count = cur.fetchone()[0]
+    if shift_count == 0:
+        for role, title, required in SHIFT_TASK_SEED:
+            cur.execute(
+                "INSERT INTO shift_tasks (role, title, is_required) VALUES (%s, %s, %s)",
+                (role, title, required),
+            )
 
     conn.commit()
 

@@ -71,6 +71,26 @@ def seed_db():
             (ratio, service_code, material_code),
         )
 
+    # Default shift checklist tasks by role
+    shift_tasks = [
+        ("master", "Выключил оборудование", 1),
+        ("master", "Убрал рабочее место", 1),
+        ("master", "Сложил материалы", 1),
+        ("master", "Проверил печать", 1),
+        ("designer", "Сохранил файлы", 1),
+        ("designer", "Передал макеты", 1),
+        ("designer", "Закрыл задачи", 1),
+        ("manager", "Проверил заказы", 1),
+        ("manager", "Уведомил клиентов", 1),
+        ("manager", "Закрыл смену", 1),
+    ]
+    if db.execute("SELECT COUNT(*) FROM shift_tasks").fetchone()[0] == 0:
+        for role, title, required in shift_tasks:
+            db.execute(
+                "INSERT INTO shift_tasks (role, title, is_required) VALUES (?, ?, ?)",
+                (role, title, required),
+            )
+
     db.commit()
     db.close()
     print("[SEED] Database seeded with default data")

@@ -20,6 +20,13 @@ export async function render(container) {
                 </div>
             </div>
 
+            <div class="card" id="shift-checklist-card" style="display:none;">
+                <h3 class="text-sm font-bold text-gray-400 uppercase mb-3">Чек-лист перед уходом</h3>
+                <div id="shift-checklist">
+                    <div class="spinner mx-auto"></div>
+                </div>
+            </div>
+
             ${isManager ? `
                 <div class="card">
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-3">Сегодня на работе</h3>
@@ -51,10 +58,12 @@ export async function render(container) {
 
 async function loadMyShift() {
     const container = document.getElementById('shift-status');
+    const checklistCard = document.getElementById('shift-checklist-card');
     try {
         const attendance = await api.get('/api/hr/my-attendance');
 
         if (!attendance) {
+            checklistCard.style.display = 'none';
             container.innerHTML = `
                 <p class="text-gray-500 mb-4">Вы ещё не отметились</p>
                 <button class="btn btn-success btn-lg btn-block" id="checkin-btn" style="min-height: 80px; font-size: 20px;">
@@ -69,6 +78,8 @@ async function loadMyShift() {
                 } catch { /* handled */ }
             };
         } else if (!attendance.check_out) {
+            checklistCard.style.display = 'block';
+            loadShiftChecklist();
             container.innerHTML = `
                 <div class="text-green-600 font-bold text-lg mb-1">На смене</div>
                 <div class="text-gray-500 mb-4">Приход: ${formatTime(attendance.check_in)}</div>
@@ -84,13 +95,49 @@ async function loadMyShift() {
                 } catch { /* handled */ }
             };
         } else {
+            checklistCard.style.display = 'none';
             container.innerHTML = `
                 <div class="text-gray-600 font-bold text-lg mb-1">Смена завершена</div>
                 <div class="text-gray-400">Приход: ${formatTime(attendance.check_in)} — Уход: ${formatTime(attendance.check_out)}</div>
             `;
         }
     } catch {
+        checklistCard.style.display = 'none';
         container.innerHTML = '<div class="text-red-500">Ошибка загрузки</div>';
+    }
+}
+
+async function loadShiftChecklist() {
+    const container = document.getElementById('shift-checklist');
+    try {
+        const tasks = await api.get('/api/hr/shift-tasks');
+        if (!tasks || tasks.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 text-sm">Нет задач для роли</p>';
+            return;
+        }
+
+        container.innerHTML = tasks.map(t => `
+            <div class="task-item" data-id="${t.id}">
+                <div class="task-checkbox ${t.completed ? 'checked' : ''}"></div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight: 600;" class="${t.completed ? 'task-done' : ''}">${t.title}</div>
+                    ${t.is_required ? '<div class="text-xs text-gray-400">Обязательная</div>' : ''}
+                </div>
+            </div>
+        `).join('');
+
+        container.querySelectorAll('.task-item').forEach(item => {
+            item.onclick = async () => {
+                const taskId = item.dataset.id;
+                const isChecked = item.querySelector('.task-checkbox').classList.contains('checked');
+                try {
+                    await api.post(`/api/hr/shift-tasks/${taskId}/complete`, { completed: !isChecked });
+                    loadShiftChecklist();
+                } catch { /* handled */ }
+            };
+        });
+    } catch {
+        container.innerHTML = '<div class="text-red-500 text-sm">Ошибка</div>';
     }
 }
 

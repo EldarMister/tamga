@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+﻿from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
@@ -19,6 +19,10 @@ class IncidentCreate(BaseModel):
     deduction_amount: float | None = None
 
 
+class ShiftTaskUpdate(BaseModel):
+    completed: bool = True
+
+
 def _today_iso() -> str:
     return date.today().isoformat()
 
@@ -33,7 +37,7 @@ async def checkin(user=Depends(get_current_user)):
     ).fetchone()
     if existing:
         db.close()
-        raise HTTPException(status_code=400, detail="Вы уже отметились сегодня")
+        raise HTTPException(status_code=400, detail="Р’С‹ СѓР¶Рµ РѕС‚РјРµС‚РёР»РёСЃСЊ СЃРµРіРѕРґРЅСЏ")
     db.execute("INSERT INTO attendance (user_id) VALUES (?)", (user["id"],))
     db.commit()
     row = db.execute(
@@ -44,20 +48,24 @@ async def checkin(user=Depends(get_current_user)):
     return dict(row)
 
 
-@router.post("/checkout")
-async def checkout(user=Depends(get_current_user)):
-    db = get_db()
-    today = _today_iso()
-    existing = db.execute(
-        "SELECT * FROM attendance WHERE user_id = ? AND date = ?",
-        (user["id"], today),
-    ).fetchone()
-    if not existing:
-        db.close()
-        raise HTTPException(status_code=400, detail="Вы ещё не отметили приход")
-    if existing["check_out"]:
-        db.close()
-        raise HTTPException(status_code=400, detail="Вы уже отметили уход")
+    # Require shift checklist before checkout
+    required = db.execute(
+        "SELECT id, title FROM shift_tasks WHERE role = ? AND is_required = 1",
+        (user["role"],),
+    ).fetchall()
+    if required:
+        done_rows = db.execute(
+            "SELECT task_id FROM shift_task_logs WHERE user_id = ? AND date = ? AND completed = 1",
+            (user["id"], today),
+        ).fetchall()
+        done_ids = {r["task_id"] for r in done_rows}
+        missing = [dict(r) for r in required if r["id"] not in done_ids]
+        if missing:
+            db.close()
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Отметьте обязательные задачи перед завершением смены", "missing_tasks": missing},
+            )
     db.execute(
         "UPDATE attendance SET check_out = datetime('now') WHERE id = ?", (existing["id"],)
     )
@@ -114,6 +122,58 @@ async def list_attendance(
     return [dict(r) for r in rows]
 
 
+@router.get("/shift-tasks")
+async def list_shift_tasks(role: str = "", user=Depends(get_current_user)):
+    db = get_db()
+    today = _today_iso()
+    target_role = role or user["role"]
+    if role and user["role"] not in ("director",):
+        db.close()
+        raise HTTPException(status_code=403, detail="РќРµС‚ РґРѕСЃС‚СѓРїР°")
+
+    rows = db.execute(
+        """SELECT st.*, COALESCE(l.completed, 0) as completed
+           FROM shift_tasks st
+           LEFT JOIN shift_task_logs l
+             ON l.task_id = st.id AND l.user_id = ? AND l.date = ?
+           WHERE st.role = ?
+           ORDER BY st.id""",
+        (user["id"], today, target_role),
+    ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+@router.post("/shift-tasks/{task_id}/complete")
+async def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(get_current_user)):
+    db = get_db()
+    task = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (task_id,)).fetchone()
+    if not task:
+        db.close()
+        raise HTTPException(status_code=404, detail="Р—Р°РґР°С‡Р° РЅРµ РЅР°Р№РґРµРЅР°")
+    if task["role"] != user["role"] and user["role"] != "director":
+        db.close()
+        raise HTTPException(status_code=403, detail="РќРµС‚ РґРѕСЃС‚СѓРїР°")
+
+    today = _today_iso()
+    if data.completed:
+        db.execute(
+            """INSERT INTO shift_task_logs (user_id, task_id, date, completed)
+               VALUES (?, ?, ?, 1)
+               ON CONFLICT(user_id, task_id, date) DO UPDATE SET completed = 1""",
+            (user["id"], task_id, today),
+        )
+    else:
+        db.execute(
+            "DELETE FROM shift_task_logs WHERE user_id = ? AND task_id = ? AND date = ?",
+            (user["id"], task_id, today),
+        )
+
+    db.commit()
+    db.close()
+    return {"ok": True}
+
+
 @router.get("/my-attendance")
 async def my_attendance(user=Depends(get_current_user)):
     db = get_db()
@@ -132,7 +192,7 @@ async def create_incident(data: IncidentCreate, user=Depends(role_required("dire
     target = db.execute("SELECT * FROM users WHERE id = ?", (data.user_id,)).fetchone()
     if not target:
         db.close()
-        raise HTTPException(status_code=400, detail="Сотрудник не найден")
+        raise HTTPException(status_code=400, detail="РЎРѕС‚СЂСѓРґРЅРёРє РЅРµ РЅР°Р№РґРµРЅ")
 
     cur = db.execute(
         """INSERT INTO incidents (user_id, type, description, order_id, material_waste, deduction_amount, created_by)
@@ -153,7 +213,7 @@ async def create_incident(data: IncidentCreate, user=Depends(role_required("dire
                 )
                 db.execute(
                     "INSERT INTO material_ledger (material_id, order_id, action, quantity, note, performed_by) VALUES (?, ?, 'defect', ?, ?, ?)",
-                    (item["material_id"], data.order_id, -data.material_waste, f"Брак: {data.description}", user["id"]),
+                    (item["material_id"], data.order_id, -data.material_waste, f"Р‘СЂР°Рє: {data.description}", user["id"]),
                 )
 
     db.commit()
@@ -210,7 +270,7 @@ async def review_incident(incident_id: int, user=Depends(role_required("director
     row = db.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
     db.close()
     if not row:
-        raise HTTPException(status_code=404, detail="Инцидент не найден")
+        raise HTTPException(status_code=404, detail="РРЅС†РёРґРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ")
     return dict(row)
 
 
@@ -220,7 +280,7 @@ async def upload_incident_photo(incident_id: int, file: UploadFile = File(...), 
     incident = db.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
     if not incident:
         db.close()
-        raise HTTPException(status_code=404, detail="Инцидент не найден")
+        raise HTTPException(status_code=404, detail="РРЅС†РёРґРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ")
 
     ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
     filename = f"incident_{incident_id}_{uuid.uuid4().hex[:8]}{ext}"
@@ -233,3 +293,5 @@ async def upload_incident_photo(incident_id: int, file: UploadFile = File(...), 
     db.commit()
     db.close()
     return {"filename": filename}
+
+

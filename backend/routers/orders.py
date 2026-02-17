@@ -12,18 +12,21 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 # Allowed status transitions: {from_status: [(to_status, allowed_roles), ...]}
 TRANSITIONS = {
     "created": [("design", ("manager", "director")), ("production", ("manager", "director")), ("cancelled", ("manager", "director"))],
-    "design": [("design_done", ("designer",)), ("cancelled", ("manager", "director"))],
-    "design_done": [("production", ("manager", "director", "master")), ("cancelled", ("manager", "director"))],
-    "production": [("printed", ("master",)), ("cancelled", ("manager", "director"))],
-    "printed": [("postprocess", ("manager", "director", "master")), ("ready", ("manager", "director")), ("cancelled", ("manager", "director"))],
-    "postprocess": [("ready", ("assistant", "manager", "director")), ("cancelled", ("manager", "director"))],
+    "design": [("production", ("designer", "manager", "director")), ("cancelled", ("manager", "director"))],
+    "production": [("ready", ("master", "manager", "director")), ("cancelled", ("manager", "director"))],
     "ready": [("closed", ("manager", "director")), ("cancelled", ("manager", "director"))],
+    # Compatibility for legacy statuses
+    "design_done": [("production", ("manager", "director", "master")), ("ready", ("manager", "director")), ("cancelled", ("manager", "director"))],
+    "printed": [("ready", ("manager", "director")), ("cancelled", ("manager", "director"))],
+    "postprocess": [("ready", ("assistant", "manager", "director")), ("cancelled", ("manager", "director"))],
 }
 
 
 class OrderItemCreate(BaseModel):
     service_id: int
     quantity: float
+    width: float | None = None
+    height: float | None = None
     options: dict = {}
 
 
@@ -44,6 +47,11 @@ class StatusUpdate(BaseModel):
     note: str = ""
 
 
+class NotifyRequest(BaseModel):
+    message: str | None = None
+    channels: list[str] | None = None
+
+
 def generate_order_number(db) -> str:
     year = datetime.now().year
     prefix = f"POL-{year}-"
@@ -55,6 +63,25 @@ def generate_order_number(db) -> str:
         last_num = int(row["order_number"].split("-")[-1])
         return f"{prefix}{last_num + 1:03d}"
     return f"{prefix}001"
+
+
+def _is_area_unit(unit: str | None) -> bool:
+    if not unit:
+        return False
+    u = unit.lower().replace(" ", "")
+    return "м2" in u or "м²" in u or "m2" in u or "m²" in u
+
+
+def _calc_item_total(unit: str, unit_price: float, quantity: float, width: float | None, height: float | None) -> tuple[float, float]:
+    # Returns (item_total, calc_units) where calc_units is base quantity for materials
+    if _is_area_unit(unit):
+        if not width or not height:
+            raise HTTPException(status_code=400, detail="Нужны ширина и высота для услуги в м²")
+        area = width * height
+        calc_units = area * quantity
+        return calc_units * unit_price, calc_units
+    calc_units = quantity
+    return calc_units * unit_price, calc_units
 
 
 @router.get("")
@@ -154,7 +181,7 @@ async def create_order(data: OrderCreate, user=Depends(role_required("manager", 
             raise HTTPException(status_code=400, detail=f"Услуга {item.service_id} не найдена")
 
         unit_price = svc["price_dealer"] if data.client_type == "dealer" and svc["price_dealer"] > 0 else svc["price_retail"]
-        item_total = item.quantity * unit_price
+        item_total, calc_units = _calc_item_total(svc["unit"], unit_price, item.quantity, item.width, item.height)
         total_price += item_total
 
         # Find material mapping
@@ -167,7 +194,7 @@ async def create_order(data: OrderCreate, user=Depends(role_required("manager", 
         material_qty = 0
         if mapping:
             material_id = mapping["material_id"]
-            material_qty = item.quantity * mapping["ratio"]
+            material_qty = calc_units * mapping["ratio"]
             material_cost += material_qty * svc["cost_price"]
 
             # Reserve material
@@ -188,6 +215,8 @@ async def create_order(data: OrderCreate, user=Depends(role_required("manager", 
             "service_id": svc["id"],
             "material_id": material_id,
             "quantity": item.quantity,
+            "width": item.width,
+            "height": item.height,
             "unit_price": unit_price,
             "total": item_total,
             "material_qty": material_qty,
@@ -208,9 +237,13 @@ async def create_order(data: OrderCreate, user=Depends(role_required("manager", 
 
     for it in items_data:
         db.execute(
-            """INSERT INTO order_items (order_id, service_id, material_id, quantity, unit_price, total, material_qty, options)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (order_id, it["service_id"], it["material_id"], it["quantity"], it["unit_price"], it["total"], it["material_qty"], it["options"]),
+            """INSERT INTO order_items (order_id, service_id, material_id, quantity, width, height, unit_price, total, material_qty, options)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                order_id, it["service_id"], it["material_id"], it["quantity"],
+                it["width"], it["height"], it["unit_price"], it["total"],
+                it["material_qty"], it["options"],
+            ),
         )
         # Ledger entry for reservation
         if it["material_id"] and it["material_qty"] > 0:
@@ -259,7 +292,7 @@ async def update_status(order_id: int, data: StatusUpdate, user=Depends(get_curr
         raise HTTPException(status_code=400, detail=f"Переход '{current}' -> '{new_status}' не разрешён для роли '{user['role']}'")
 
     # Side effects
-    if new_status == "printed":
+    if new_status == "production":
         # Consume material (move from reserved to consumed)
         items = db.execute("SELECT * FROM order_items WHERE order_id = ?", (order_id,)).fetchall()
         for item in items:
@@ -279,7 +312,7 @@ async def update_status(order_id: int, data: StatusUpdate, user=Depends(get_curr
         for item in items:
             if item["material_id"] and item["material_qty"] > 0:
                 # Only unreserve if not yet consumed (status was before 'printed')
-                if current in ("created", "design", "design_done", "production"):
+                if current in ("created", "design", "design_done"):
                     db.execute(
                         "UPDATE materials SET reserved = reserved - ?, updated_at = datetime('now') WHERE id = ?",
                         (item["material_qty"], item["material_id"]),
@@ -295,10 +328,40 @@ async def update_status(order_id: int, data: StatusUpdate, user=Depends(get_curr
         (order_id, current, new_status, user["id"], data.note or f"{current} -> {new_status}"),
     )
 
+    if new_status == "ready":
+        db.execute(
+            "INSERT INTO client_notifications (order_id, channel, message, status) VALUES (?, 'manual', 'Ваш заказ готов. Можете забирать. PolyControl.', 'queued')",
+            (order_id,),
+        )
+
     db.commit()
     updated = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
     db.close()
     return dict(updated)
+
+
+@router.post("/{order_id}/notify")
+async def notify_client(order_id: int, data: NotifyRequest, user=Depends(role_required("manager", "director"))):
+    db = get_db()
+    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if not order:
+        db.close()
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    message = data.message or "Ваш заказ готов. Можете забирать. PolyControl."
+    channels = data.channels or ["manual"]
+
+    created = []
+    for ch in channels:
+        cur = db.execute(
+            "INSERT INTO client_notifications (order_id, channel, message, status) VALUES (?, ?, ?, 'queued')",
+            (order_id, ch, message),
+        )
+        created.append({"id": cur.lastrowid, "channel": ch})
+
+    db.commit()
+    db.close()
+    return {"ok": True, "notifications": created}
 
 
 @router.post("/{order_id}/design")
@@ -321,6 +384,27 @@ async def upload_design(order_id: int, file: UploadFile = File(...), user=Depend
         f.write(content)
 
     db.execute("UPDATE orders SET design_file = ?, updated_at = datetime('now') WHERE id = ?", (filename, order_id))
+    db.commit()
+    db.close()
+    return {"filename": filename}
+
+
+@router.post("/{order_id}/photo")
+async def upload_photo(order_id: int, file: UploadFile = File(...), user=Depends(get_current_user)):
+    db = get_db()
+    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if not order:
+        db.close()
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
+    filename = f"order_{order_id}_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    db.execute("UPDATE orders SET photo_file = ?, updated_at = datetime('now') WHERE id = ?", (filename, order_id))
     db.commit()
     db.close()
     return {"filename": filename}

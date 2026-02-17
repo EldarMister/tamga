@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+﻿import { api } from '../api.js';
 import { state } from '../state.js';
 import { formatCurrency, formatDate, statusBadgeClass, statusLabel, isOverdue } from '../utils.js';
 
@@ -6,10 +6,9 @@ const STATUS_FILTERS = [
     { value: '', label: 'Все' },
     { value: 'created', label: 'Новые' },
     { value: 'design', label: 'Дизайн' },
-    { value: 'production', label: 'Печать' },
-    { value: 'postprocess', label: 'Обработка' },
-    { value: 'ready', label: 'Готовы' },
-    { value: 'closed', label: 'Закрыты' },
+    { value: 'production', label: 'Производство' },
+    { value: 'ready', label: 'Готовые' },
+    { value: 'closed', label: 'Закрытые' },
 ];
 
 let currentFilter = '';
@@ -98,24 +97,35 @@ async function loadOrders() {
 
 function renderOrderCard(order) {
     const overdue = isOverdue(order);
-    const serviceName = order.items?.[0]?.name_ru || '—';
-    const qty = order.items?.[0]?.quantity || '';
-    const unit = order.items?.[0]?.unit || '';
+    const itemsCount = order.items?.length || 0;
+    const mainItem = order.items?.[0];
+    const summary = itemsCount > 1
+        ? `${itemsCount} услуг`
+        : (mainItem ? `${mainItem.name_ru} • ${mainItem.quantity} ${mainItem.unit || ''}` : '—');
+
+    const thumb = order.photo_file
+        ? `<img src="/api/uploads/${order.photo_file}" class="order-thumb" alt="Фото">`
+        : '<div class="order-thumb-placeholder"></div>';
 
     return `
         <div class="card cursor-pointer hover:shadow-md transition-shadow order-card ${overdue ? 'border-red-400 border-2' : ''}" data-id="${order.id}">
-            <div class="flex items-start justify-between mb-2">
+            <div class="order-card-grid">
+                ${thumb}
                 <div>
-                    <span class="font-bold text-blue-800">${order.order_number}</span>
-                    ${overdue ? '<span class="badge badge-overdue ml-2">Просрочен</span>' : ''}
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <span class="font-bold text-blue-800">${order.order_number}</span>
+                            ${overdue ? '<span class="badge badge-overdue ml-2">Просрочен</span>' : ''}
+                        </div>
+                        <span class="${statusBadgeClass(order.status)}">${statusLabel(order.status)}</span>
+                    </div>
+                    <div class="text-gray-900 font-medium">${order.client_name}</div>
+                    <div class="text-sm text-gray-500 mt-1">${summary}</div>
+                    <div class="flex items-center justify-between mt-3 text-sm">
+                        <span class="font-bold text-lg">${formatCurrency(order.total_price)}</span>
+                        <span class="text-gray-400">${order.deadline ? formatDate(order.deadline) : formatDate(order.created_at)}</span>
+                    </div>
                 </div>
-                <span class="${statusBadgeClass(order.status)}">${statusLabel(order.status)}</span>
-            </div>
-            <div class="text-gray-900 font-medium">${order.client_name}</div>
-            <div class="text-sm text-gray-500 mt-1">${serviceName} ${qty ? `• ${qty} ${unit}` : ''}</div>
-            <div class="flex items-center justify-between mt-3 text-sm">
-                <span class="font-bold text-lg">${formatCurrency(order.total_price)}</span>
-                <span class="text-gray-400">${order.deadline ? formatDate(order.deadline) : formatDate(order.created_at)}</span>
             </div>
         </div>
     `;
