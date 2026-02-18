@@ -750,7 +750,7 @@ select.input {
 
 /* ============ PAGE TRANSITIONS ============ */
 .page-enter {
-    animation: pageIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: pageIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes pageIn {

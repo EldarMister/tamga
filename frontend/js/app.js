@@ -4,8 +4,8 @@ import { renderTabBar } from './components/tab-bar.js';
 import { api } from './api.js';
 import { showToast } from './components/toast.js';
 
-// Page modules
-const pages = {
+// Page modules — lazy loaders + preloaded cache
+const pageLoaders = {
     '/login': () => import('./pages/login.js'),
     '/dashboard': () => import('./pages/dashboard.js'),
     '/orders': () => import('./pages/orders.js'),
@@ -25,6 +25,21 @@ const pages = {
     '/tasks': () => import('./pages/tasks.js'),
     '/training': () => import('./pages/training.js'),
 };
+
+const pageCache = {};
+
+function preloadPages() {
+    for (const [route, loader] of Object.entries(pageLoaders)) {
+        loader().then(mod => { pageCache[route] = mod; });
+    }
+}
+
+function getPage(route) {
+    if (pageCache[route]) return Promise.resolve(pageCache[route]);
+    const loader = pageLoaders[route];
+    if (!loader) return null;
+    return loader().then(mod => { pageCache[route] = mod; return mod; });
+}
 
 const DEFAULT_PAGE = '/dashboard';
 
@@ -57,25 +72,27 @@ async function navigate() {
         return;
     }
 
-    const loader = pages[route];
-    if (!loader) {
+    const pagePromise = getPage(route);
+    if (!pagePromise) {
         app.innerHTML = `<div style="text-align: center; padding: 64px; color: var(--text-tertiary);">Страница не найдена</div>`;
         renderTabBar();
         return;
     }
 
+    // Update tab bar immediately for instant feedback
+    renderTabBar();
+
     try {
-        const mod = await loader();
+        const mod = await pagePromise;
+        app.classList.remove('page-enter');
+        void app.offsetWidth; // force reflow for re-trigger
         app.classList.add('page-enter');
         await mod.render(app, params);
-        setTimeout(() => app.classList.remove('page-enter'), 400);
         checkAnnouncements();
     } catch (err) {
         console.error('Page load error:', err);
         app.innerHTML = `<div style="text-align: center; padding: 64px; color: var(--danger);">Ошибка загрузки страницы</div>`;
     }
-
-    renderTabBar();
 }
 
 // Theme management
@@ -140,6 +157,8 @@ async function init() {
     await loadTranslations(state.lang);
     window.addEventListener('hashchange', navigate);
     navigate();
+    // Preload all pages in background after first render
+    preloadPages();
 }
 
 init();

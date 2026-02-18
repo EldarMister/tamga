@@ -50,22 +50,20 @@ const TABS = {
         { id: 'dashboard', hash: '#/dashboard', icon: 'dashboard' },
         { id: 'orders', hash: '#/orders', icon: 'orders' },
         { id: 'hr', hash: '#/hr', icon: 'hr' },
-        { id: 'training', hash: '#/training', icon: 'training' },
-        { id: 'profile', hash: '#/profile', icon: 'profile' },
+        { id: 'more', hash: '#/more', icon: 'more' },
     ],
     master: [
         { id: 'dashboard', hash: '#/dashboard', icon: 'dashboard' },
         { id: 'orders', hash: '#/orders', icon: 'orders' },
         { id: 'inventory', hash: '#/inventory', icon: 'inventory' },
-        { id: 'training', hash: '#/training', icon: 'training' },
         { id: 'hr', hash: '#/hr', icon: 'hr' },
+        { id: 'more', hash: '#/more', icon: 'more' },
     ],
     assistant: [
         { id: 'dashboard', hash: '#/dashboard', icon: 'dashboard' },
         { id: 'orders', hash: '#/orders', icon: 'orders' },
         { id: 'hr', hash: '#/hr', icon: 'hr' },
-        { id: 'training', hash: '#/training', icon: 'training' },
-        { id: 'profile', hash: '#/profile', icon: 'profile' },
+        { id: 'more', hash: '#/more', icon: 'more' },
     ],
 };
 

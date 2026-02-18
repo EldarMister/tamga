@@ -1,0 +1,325 @@
+{
+  "generated_at": "2026-02-18 01:15:15",
+  "sql_scan": [
+    {
+      "endpoint": "GET /api/orders?limit=100&offset=0",
+      "status": 200,
+      "elapsed_ms": 10.78,
+      "bytes": 650,
+      "sql_queries": 3
+    },
+    {
+      "endpoint": "GET /api/orders/1",
+      "status": 200,
+      "elapsed_ms": 12.17,
+      "bytes": 824,
+      "sql_queries": 3
+    },
+    {
+      "endpoint": "GET /api/inventory",
+      "status": 200,
+      "elapsed_ms": 21.36,
+      "bytes": 1275,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/pricelist",
+      "status": 200,
+      "elapsed_ms": 32.2,
+      "bytes": 3556,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/hr/my-attendance",
+      "status": 200,
+      "elapsed_ms": 21.28,
+      "bytes": 4,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/hr/shift-tasks",
+      "status": 200,
+      "elapsed_ms": 21.31,
+      "bytes": 2,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/hr/attendance/today",
+      "status": 200,
+      "elapsed_ms": 13.44,
+      "bytes": 2,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/hr/incidents?status=pending",
+      "status": 200,
+      "elapsed_ms": 19.27,
+      "bytes": 2,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/users",
+      "status": 200,
+      "elapsed_ms": 11.71,
+      "bytes": 512,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/tasks?type=daily",
+      "status": 200,
+      "elapsed_ms": 13.23,
+      "bytes": 2,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/reports/orders-summary?date_from=2026-01-19&date_to=2026-02-18",
+      "status": 200,
+      "elapsed_ms": 11.12,
+      "bytes": 144,
+      "sql_queries": 2
+    },
+    {
+      "endpoint": "GET /api/reports/employee-stats?date_from=2026-01-19&date_to=2026-02-18",
+      "status": 200,
+      "elapsed_ms": 12.72,
+      "bytes": 330,
+      "sql_queries": 4
+    },
+    {
+      "endpoint": "GET /api/reports/finance?date_from=2026-01-19&date_to=2026-02-18",
+      "status": 200,
+      "elapsed_ms": 13.94,
+      "bytes": 259,
+      "sql_queries": 5
+    },
+    {
+      "endpoint": "GET /api/payroll/month-report?month_start=2026-02-01&month_end=2026-02-18",
+      "status": 200,
+      "elapsed_ms": 11.58,
+      "bytes": 370,
+      "sql_queries": 7
+    },
+    {
+      "endpoint": "GET /api/training",
+      "status": 200,
+      "elapsed_ms": 9.22,
+      "bytes": 2,
+      "sql_queries": 1
+    },
+    {
+      "endpoint": "GET /api/announcements",
+      "status": 200,
+      "elapsed_ms": 10.93,
+      "bytes": 2,
+      "sql_queries": 1
+    }
+  ],
+  "http_scan": {
+    "api": [
+      {
+        "endpoint": "GET /api/orders?limit=100&offset=0",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/orders/1",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/inventory",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/pricelist",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/hr/my-attendance",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/hr/shift-tasks",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/hr/attendance/today",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/users",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/tasks?type=daily",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/reports/orders-summary?date_from=2026-01-19&date_to=2026-02-18",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/reports/finance?date_from=2026-01-19&date_to=2026-02-18",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/payroll/month-report?month_start=2026-02-01&month_end=2026-02-18",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/training",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/announcements",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "endpoint": "GET /api/hr/incidents?date_from=2026-01-19&date_to=2026-02-18",
+        "runs": [
+          {
+            "error": "timed out"
+          }
+        ]
+      }
+    ],
+    "static": [
+      {
+        "path": "/js/app.js",
+        "error": "timed out"
+      },
+      {
+        "path": "/css/app.css",
+        "error": "timed out"
+      },
+      {
+        "path": "/js/api.js",
+        "error": "timed out"
+      }
+    ]
+  },
+  "frontend_scan": [
+    {
+      "route": "/dashboard",
+      "error": "Page.wait_for_function: Timeout 15000ms exceeded."
+    },
+    {
+      "route": "/orders",
+      "error": "Page.wait_for_function: Timeout 15000ms exceeded."
+    },
+    {
+      "route": "/orders/new",
+      "error": "Page.wait_for_function: Timeout 15000ms exceeded."
+    },
+    {
+      "route": "/orders/1",
+      "error": "Page.wait_for_function: Timeout 15000ms exceeded."
+    },
+    {
+      "route": "/inventory",
+      "error": "Page.wait_for_function: Timeout 15000ms exceeded."
+    },
+    {
+      "route": "/pricelist",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/hr",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/payroll",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/users",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/reports",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/fines",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/announcements",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/shift-checklist",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/profile",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/more",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/tasks",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    },
+    {
+      "route": "/training",
+      "error": "Page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:8010/\", waiting until \"load\"\n"
+    }
+  ]
+}
