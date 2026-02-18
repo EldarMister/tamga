@@ -10,15 +10,17 @@ from datetime import datetime
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 # Allowed status transitions: {from_status: [(to_status, allowed_roles), ...]}
+_ALL_ROLES = ("director", "manager", "designer", "master", "assistant")
+
 TRANSITIONS = {
-    "created": [("design", ("manager", "director")), ("production", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
-    "design": [("production", ("designer", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
-    "production": [("ready", ("master", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
-    "ready": [("closed", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "created": [("design", ("manager", "director")), ("production", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
+    "design": [("production", ("designer", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
+    "production": [("ready", ("master", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
+    "ready": [("closed", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
     # Compatibility for legacy statuses
-    "design_done": [("production", ("manager", "director", "master")), ("ready", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
-    "printed": [("ready", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
-    "postprocess": [("ready", ("assistant", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "design_done": [("production", ("manager", "director", "master")), ("ready", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
+    "printed": [("ready", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
+    "postprocess": [("ready", ("assistant", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", _ALL_ROLES)],
     "defect": [("cancelled", ("manager", "director"))],
 }
 

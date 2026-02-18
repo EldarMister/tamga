@@ -38,7 +38,7 @@ function renderOrder(container, order) {
     const next = NEXT_STATUS[order.status];
     const canAdvance = next && next.roles.includes(state.user.role);
     const canCancel = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
-    const canMarkDefect = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
+    const canMarkDefect = !['closed', 'cancelled', 'defect'].includes(order.status);
     const canUploadDesign = ['designer', 'manager', 'director'].includes(state.user.role) && ['design', 'created'].includes(order.status);
     const canNotify = ['manager', 'director'].includes(state.user.role) && order.status === 'ready';
 
