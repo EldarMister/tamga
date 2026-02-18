@@ -12,7 +12,7 @@ class AnnouncementCreate(BaseModel):
 
 
 @router.get("")
-async def list_announcements(unread: int = 0, user=Depends(get_current_user)):
+def list_announcements(unread: int = 0, user=Depends(get_current_user)):
     db = get_db()
     conditions = ["(a.target_user_id IS NULL OR a.target_user_id = ?)"]
     params = [user["id"]]
@@ -37,7 +37,7 @@ async def list_announcements(unread: int = 0, user=Depends(get_current_user)):
 
 
 @router.post("")
-async def create_announcement(data: AnnouncementCreate, user=Depends(role_required("director"))):
+def create_announcement(data: AnnouncementCreate, user=Depends(role_required("director"))):
     if not data.message.strip():
         raise HTTPException(status_code=400, detail="Сообщение пустое")
 
@@ -54,7 +54,7 @@ async def create_announcement(data: AnnouncementCreate, user=Depends(role_requir
 
 
 @router.post("/{announcement_id}/read")
-async def mark_read(announcement_id: int, user=Depends(get_current_user)):
+def mark_read(announcement_id: int, user=Depends(get_current_user)):
     db = get_db()
     db.execute(
         """INSERT INTO announcement_reads (announcement_id, user_id)

@@ -39,7 +39,7 @@ def login(data: LoginRequest):
 
 
 @router.get("/me")
-async def me(user=Depends(get_current_user)):
+def me(user=Depends(get_current_user)):
     return {
         "id": user["id"],
         "username": user["username"],
@@ -51,7 +51,7 @@ async def me(user=Depends(get_current_user)):
 
 
 @router.post("/change-password")
-async def change_password(data: ChangePasswordRequest, user=Depends(get_current_user)):
+def change_password(data: ChangePasswordRequest, user=Depends(get_current_user)):
     if not verify_password(data.old_password, user["password_hash"]):
         raise HTTPException(status_code=400, detail="Неверный текущий пароль")
     db = get_db()

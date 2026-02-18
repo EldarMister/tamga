@@ -40,7 +40,7 @@ def _today_iso() -> str:
 
 
 @router.post("/checkin")
-async def checkin(user=Depends(get_current_user)):
+def checkin(user=Depends(get_current_user)):
     db = get_db()
     today = _today_iso()
     existing = db.execute(
@@ -61,7 +61,7 @@ async def checkin(user=Depends(get_current_user)):
 
 
 @router.post("/checkout")
-async def checkout(user=Depends(get_current_user)):
+def checkout(user=Depends(get_current_user)):
     db = get_db()
     today = _today_iso()
     existing = db.execute(
@@ -103,7 +103,7 @@ async def checkout(user=Depends(get_current_user)):
 
 
 @router.get("/attendance/today")
-async def today_attendance(user=Depends(role_required("director", "manager"))):
+def today_attendance(user=Depends(role_required("director", "manager"))):
     db = get_db()
     today = _today_iso()
     rows = db.execute(
@@ -118,7 +118,7 @@ async def today_attendance(user=Depends(role_required("director", "manager"))):
 
 
 @router.get("/attendance")
-async def list_attendance(
+def list_attendance(
     date_from: str = "",
     date_to: str = "",
     user_id: int = 0,
@@ -151,7 +151,7 @@ async def list_attendance(
 
 
 @router.get("/shift-tasks")
-async def list_shift_tasks(role: str = "", user=Depends(get_current_user)):
+def list_shift_tasks(role: str = "", user=Depends(get_current_user)):
     db = get_db()
     today = _today_iso()
     target_role = role or user["role"]
@@ -173,7 +173,7 @@ async def list_shift_tasks(role: str = "", user=Depends(get_current_user)):
 
 
 @router.post("/shift-tasks/{task_id}/complete")
-async def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(get_current_user)):
+def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(get_current_user)):
     db = get_db()
     task = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (task_id,)).fetchone()
     if not task:
@@ -203,7 +203,7 @@ async def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(
 
 
 @router.get("/shift-tasks/catalog")
-async def list_shift_task_defs(role: str = "", user=Depends(role_required("director"))):
+def list_shift_task_defs(role: str = "", user=Depends(role_required("director"))):
     # Director-only: manage checklist definitions
     db = get_db()
     conditions = ["1=1"]
@@ -221,7 +221,7 @@ async def list_shift_task_defs(role: str = "", user=Depends(role_required("direc
 
 
 @router.post("/shift-tasks")
-async def create_shift_task(data: ShiftTaskCreate, user=Depends(role_required("director"))):
+def create_shift_task(data: ShiftTaskCreate, user=Depends(role_required("director"))):
     if not data.title.strip():
         raise HTTPException(status_code=400, detail="Название задачи пустое")
     db = get_db()
@@ -236,7 +236,7 @@ async def create_shift_task(data: ShiftTaskCreate, user=Depends(role_required("d
 
 
 @router.patch("/shift-tasks/{task_id}")
-async def update_shift_task(task_id: int, data: ShiftTaskDefUpdate, user=Depends(role_required("director"))):
+def update_shift_task(task_id: int, data: ShiftTaskDefUpdate, user=Depends(role_required("director"))):
     db = get_db()
     row = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (task_id,)).fetchone()
     if not row:
@@ -263,7 +263,7 @@ async def update_shift_task(task_id: int, data: ShiftTaskDefUpdate, user=Depends
 
 
 @router.delete("/shift-tasks/{task_id}")
-async def delete_shift_task(task_id: int, user=Depends(role_required("director"))):
+def delete_shift_task(task_id: int, user=Depends(role_required("director"))):
     db = get_db()
     db.execute("DELETE FROM shift_tasks WHERE id = ?", (task_id,))
     db.commit()
@@ -272,7 +272,7 @@ async def delete_shift_task(task_id: int, user=Depends(role_required("director")
 
 
 @router.get("/shift-tasks/report")
-async def shift_tasks_report(date: str = "", role: str = "", user=Depends(role_required("director"))):
+def shift_tasks_report(date: str = "", role: str = "", user=Depends(role_required("director"))):
     # Director-only: view completion by user
     db = get_db()
     target_date = date or _today_iso()
@@ -312,7 +312,7 @@ async def shift_tasks_report(date: str = "", role: str = "", user=Depends(role_r
 
 
 @router.get("/my-attendance")
-async def my_attendance(user=Depends(get_current_user)):
+def my_attendance(user=Depends(get_current_user)):
     db = get_db()
     today = _today_iso()
     row = db.execute(
@@ -324,7 +324,7 @@ async def my_attendance(user=Depends(get_current_user)):
 
 
 @router.post("/incidents")
-async def create_incident(data: IncidentCreate, user=Depends(role_required("director", "manager"))):
+def create_incident(data: IncidentCreate, user=Depends(role_required("director", "manager"))):
     db = get_db()
     target = db.execute("SELECT * FROM users WHERE id = ?", (data.user_id,)).fetchone()
     if not target:
@@ -360,7 +360,7 @@ async def create_incident(data: IncidentCreate, user=Depends(role_required("dire
 
 
 @router.get("/incidents")
-async def list_incidents(
+def list_incidents(
     status: str = "",
     user_id: int = 0,
     date_from: str = "",
@@ -401,7 +401,7 @@ async def list_incidents(
 
 
 @router.patch("/incidents/{incident_id}/review")
-async def review_incident(incident_id: int, user=Depends(role_required("director"))):
+def review_incident(incident_id: int, user=Depends(role_required("director"))):
     db = get_db()
     db.execute("UPDATE incidents SET status = 'reviewed' WHERE id = ?", (incident_id,))
     db.commit()

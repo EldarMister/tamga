@@ -85,7 +85,7 @@ def _calc_item_total(unit: str, unit_price: float, quantity: float, width: float
 
 
 @router.get("")
-async def list_orders(
+def list_orders(
     status: str = "",
     search: str = "",
     assigned: str = "",
@@ -145,7 +145,7 @@ async def list_orders(
 
 
 @router.get("/{order_id}")
-async def get_order(order_id: int, user=Depends(get_current_user)):
+def get_order(order_id: int, user=Depends(get_current_user)):
     db = get_db()
     order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
@@ -173,7 +173,7 @@ async def get_order(order_id: int, user=Depends(get_current_user)):
 
 
 @router.post("")
-async def create_order(data: OrderCreate, user=Depends(role_required("manager", "director"))):
+def create_order(data: OrderCreate, user=Depends(role_required("manager", "director"))):
     db = get_db()
     order_number = generate_order_number(db)
 
@@ -272,7 +272,7 @@ async def create_order(data: OrderCreate, user=Depends(role_required("manager", 
 
 
 @router.patch("/{order_id}/status")
-async def update_status(order_id: int, data: StatusUpdate, user=Depends(get_current_user)):
+def update_status(order_id: int, data: StatusUpdate, user=Depends(get_current_user)):
     db = get_db()
     order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
@@ -348,7 +348,7 @@ async def update_status(order_id: int, data: StatusUpdate, user=Depends(get_curr
 
 
 @router.post("/{order_id}/notify")
-async def notify_client(order_id: int, data: NotifyRequest, user=Depends(role_required("manager", "director"))):
+def notify_client(order_id: int, data: NotifyRequest, user=Depends(role_required("manager", "director"))):
     db = get_db()
     order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
@@ -418,7 +418,7 @@ async def upload_photo(order_id: int, file: UploadFile = File(...), user=Depends
 
 
 @router.put("/{order_id}")
-async def update_order(order_id: int, data: dict, user=Depends(role_required("manager", "director"))):
+def update_order(order_id: int, data: dict, user=Depends(role_required("manager", "director"))):
     db = get_db()
     order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:

@@ -13,7 +13,7 @@ class PriceUpdate(BaseModel):
 
 
 @router.get("")
-async def get_pricelist(user=Depends(get_current_user)):
+def get_pricelist(user=Depends(get_current_user)):
     db = get_db()
     rows = db.execute("SELECT * FROM services WHERE is_active = 1 ORDER BY id LIMIT 200").fetchall()
     db.close()
@@ -28,7 +28,7 @@ async def get_pricelist(user=Depends(get_current_user)):
 
 
 @router.put("/{service_id}")
-async def update_price(service_id: int, data: PriceUpdate, user=Depends(role_required("director"))):
+def update_price(service_id: int, data: PriceUpdate, user=Depends(role_required("director"))):
     db = get_db()
     svc = db.execute("SELECT * FROM services WHERE id = ?", (service_id,)).fetchone()
     if not svc:

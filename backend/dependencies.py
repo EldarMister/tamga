@@ -3,7 +3,7 @@ from backend.auth import decode_token
 from backend.database import get_db
 
 
-async def get_current_user(request: Request) -> dict:
+def get_current_user(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -20,8 +20,8 @@ async def get_current_user(request: Request) -> dict:
 
 
 def role_required(*roles):
-    async def checker(request: Request):
-        user = await get_current_user(request)
+    def checker(request: Request):
+        user = get_current_user(request)
         if user["role"] not in roles:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user

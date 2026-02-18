@@ -102,7 +102,7 @@ def _build_finance_data(db, date_from: str = "", date_to: str = ""):
 
 
 @router.get("/orders-summary")
-async def orders_summary(date_from: str = "", date_to: str = "", user=Depends(role_required("director", "manager"))):
+def orders_summary(date_from: str = "", date_to: str = "", user=Depends(role_required("director", "manager"))):
     db = get_db()
     conditions = ["1=1"]
     params = []
@@ -133,7 +133,7 @@ async def orders_summary(date_from: str = "", date_to: str = "", user=Depends(ro
 
 
 @router.get("/material-usage")
-async def material_usage(date_from: str = "", date_to: str = "", user=Depends(role_required("director", "manager"))):
+def material_usage(date_from: str = "", date_to: str = "", user=Depends(role_required("director", "manager"))):
     db = get_db()
     conditions = ["ml.action = 'consume'"]
     params = []
@@ -158,7 +158,7 @@ async def material_usage(date_from: str = "", date_to: str = "", user=Depends(ro
 
 
 @router.get("/employee-stats")
-async def employee_stats(date_from: str = "", date_to: str = "", user=Depends(role_required("director"))):
+def employee_stats(date_from: str = "", date_to: str = "", user=Depends(role_required("director"))):
     db = get_db()
     employees = db.execute("SELECT id, full_name, role FROM users WHERE is_active = 1 ORDER BY full_name").fetchall()
 
@@ -219,7 +219,7 @@ async def employee_stats(date_from: str = "", date_to: str = "", user=Depends(ro
 
 
 @router.get("/finance")
-async def finance_report(date_from: str = "", date_to: str = "", user=Depends(role_required("director"))):
+def finance_report(date_from: str = "", date_to: str = "", user=Depends(role_required("director"))):
     db = get_db()
     data = _build_finance_data(db, date_from, date_to)
     db.close()
@@ -227,7 +227,7 @@ async def finance_report(date_from: str = "", date_to: str = "", user=Depends(ro
 
 
 @router.get("/finance-export.csv")
-async def finance_export_csv(date_from: str = "", date_to: str = "", user=Depends(role_required("director"))):
+def finance_export_csv(date_from: str = "", date_to: str = "", user=Depends(role_required("director"))):
     db = get_db()
     data = _build_finance_data(db, date_from, date_to)
     db.close()

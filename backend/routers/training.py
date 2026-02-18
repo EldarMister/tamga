@@ -20,7 +20,7 @@ class TrainingCreate(BaseModel):
 
 
 @router.get("")
-async def list_training(user=Depends(get_current_user)):
+def list_training(user=Depends(get_current_user)):
     db = get_db()
     rows = db.execute(
         """SELECT tr.*, u.full_name as created_by_name,
@@ -43,7 +43,7 @@ async def list_training(user=Depends(get_current_user)):
 
 
 @router.post("")
-async def create_training(data: TrainingCreate, user=Depends(role_required("director"))):
+def create_training(data: TrainingCreate, user=Depends(role_required("director"))):
     youtube_url = (data.youtube_url or "").strip()
     photo_url = (data.photo_url or "").strip() or None
     db = get_db()
@@ -59,7 +59,7 @@ async def create_training(data: TrainingCreate, user=Depends(role_required("dire
 
 
 @router.patch("/{training_id}/watch")
-async def mark_watched(training_id: int, user=Depends(get_current_user)):
+def mark_watched(training_id: int, user=Depends(get_current_user)):
     db = get_db()
     existing = db.execute(
         "SELECT * FROM training_progress WHERE training_id = ? AND user_id = ?",
@@ -84,7 +84,7 @@ async def mark_watched(training_id: int, user=Depends(get_current_user)):
 
 
 @router.delete("/{training_id}")
-async def delete_training(training_id: int, user=Depends(role_required("director"))):
+def delete_training(training_id: int, user=Depends(role_required("director"))):
     db = get_db()
     db.execute("DELETE FROM training_progress WHERE training_id = ?", (training_id,))
     db.execute("DELETE FROM training WHERE id = ?", (training_id,))
@@ -116,7 +116,7 @@ async def upload_training_photo(training_id: int, file: UploadFile = File(...), 
 
 
 @router.get("/progress")
-async def training_progress(user=Depends(role_required("director", "manager"))):
+def training_progress(user=Depends(role_required("director", "manager"))):
     """Get training progress for all employees."""
     db = get_db()
     employees = db.execute("SELECT id, full_name, role FROM users WHERE is_active = 1 ORDER BY full_name").fetchall()

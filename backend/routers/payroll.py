@@ -28,7 +28,7 @@ def _period_end(data: PayrollEntry) -> str | None:
 
 
 @router.get("")
-async def list_payroll(month_start: str = "", week_start: str = "", user=Depends(role_required("director"))):
+def list_payroll(month_start: str = "", week_start: str = "", user=Depends(role_required("director"))):
     db = get_db()
     target_start = month_start or week_start
     if target_start:
@@ -50,7 +50,7 @@ async def list_payroll(month_start: str = "", week_start: str = "", user=Depends
     return [dict(r) for r in rows]
 
 
-async def _period_report(period_start: str, period_end: str):
+def _period_report(period_start: str, period_end: str):
     db = get_db()
     employees = db.execute("SELECT * FROM users WHERE is_active = 1 AND role != 'director' ORDER BY full_name").fetchall()
 
@@ -128,18 +128,18 @@ async def _period_report(period_start: str, period_end: str):
 
 
 @router.get("/month-report")
-async def month_report(month_start: str, month_end: str, user=Depends(role_required("director"))):
-    return await _period_report(month_start, month_end)
+def month_report(month_start: str, month_end: str, user=Depends(role_required("director"))):
+    return _period_report(month_start, month_end)
 
 
 @router.get("/week-report")
-async def week_report(week_start: str, week_end: str, user=Depends(role_required("director"))):
+def week_report(week_start: str, week_end: str, user=Depends(role_required("director"))):
     # Backward compatibility route.
-    return await _period_report(week_start, week_end)
+    return _period_report(week_start, week_end)
 
 
 @router.post("")
-async def save_payroll(data: PayrollEntry, user=Depends(role_required("director"))):
+def save_payroll(data: PayrollEntry, user=Depends(role_required("director"))):
     period_start = _period_start(data)
     period_end = _period_end(data)
     if not period_start or not period_end:
@@ -175,7 +175,7 @@ async def save_payroll(data: PayrollEntry, user=Depends(role_required("director"
 
 
 @router.patch("/{payroll_id}/pay")
-async def mark_paid(payroll_id: int, user=Depends(role_required("director"))):
+def mark_paid(payroll_id: int, user=Depends(role_required("director"))):
     db = get_db()
     row = db.execute("SELECT * FROM payroll WHERE id = ?", (payroll_id,)).fetchone()
     if not row:

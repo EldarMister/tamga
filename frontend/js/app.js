@@ -47,7 +47,7 @@ function parseHash() {
     const hash = window.location.hash.slice(1) || DEFAULT_PAGE;
     const parts = hash.split('/').filter(Boolean);
 
-    if (pages['/' + parts.join('/')]) {
+    if (pageLoaders['/' + parts.join('/')]) {
         return { route: '/' + parts.join('/'), params: {} };
     }
 

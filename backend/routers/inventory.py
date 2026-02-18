@@ -12,7 +12,7 @@ class MaterialAdjust(BaseModel):
 
 
 @router.get("")
-async def get_inventory(user=Depends(get_current_user)):
+def get_inventory(user=Depends(get_current_user)):
     if user["role"] not in ("director", "manager", "master"):
         raise HTTPException(status_code=403, detail="Нет доступа")
     db = get_db()
@@ -28,7 +28,7 @@ async def get_inventory(user=Depends(get_current_user)):
 
 
 @router.get("/alerts")
-async def get_alerts(user=Depends(get_current_user)):
+def get_alerts(user=Depends(get_current_user)):
     if user["role"] not in ("director", "manager"):
         raise HTTPException(status_code=403, detail="Нет доступа")
     db = get_db()
@@ -38,7 +38,7 @@ async def get_alerts(user=Depends(get_current_user)):
 
 
 @router.get("/{material_id}/ledger")
-async def get_ledger(material_id: int, limit: int = 50, offset: int = 0, user=Depends(role_required("director", "manager"))):
+def get_ledger(material_id: int, limit: int = 50, offset: int = 0, user=Depends(role_required("director", "manager"))):
     db = get_db()
     rows = db.execute(
         """SELECT ml.*, u.full_name, o.order_number
@@ -54,7 +54,7 @@ async def get_ledger(material_id: int, limit: int = 50, offset: int = 0, user=De
 
 
 @router.post("/{material_id}/receive")
-async def receive_material(material_id: int, data: MaterialAdjust, user=Depends(role_required("director", "manager"))):
+def receive_material(material_id: int, data: MaterialAdjust, user=Depends(role_required("director", "manager"))):
     if data.quantity <= 0:
         raise HTTPException(status_code=400, detail="Количество должно быть положительным")
     db = get_db()
@@ -77,7 +77,7 @@ async def receive_material(material_id: int, data: MaterialAdjust, user=Depends(
 
 
 @router.post("/{material_id}/correction")
-async def correct_material(material_id: int, data: MaterialAdjust, user=Depends(role_required("director", "manager"))):
+def correct_material(material_id: int, data: MaterialAdjust, user=Depends(role_required("director", "manager"))):
     db = get_db()
     mat = db.execute("SELECT * FROM materials WHERE id = ?", (material_id,)).fetchone()
     if not mat:

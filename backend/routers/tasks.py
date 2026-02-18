@@ -15,7 +15,7 @@ class TaskCreate(BaseModel):
 
 
 @router.get("")
-async def list_tasks(type: str = "", assigned_to: int = 0, done: str = "", user=Depends(get_current_user)):
+def list_tasks(type: str = "", assigned_to: int = 0, done: str = "", user=Depends(get_current_user)):
     db = get_db()
     conditions = ["1=1"]
     params = []
@@ -53,7 +53,7 @@ async def list_tasks(type: str = "", assigned_to: int = 0, done: str = "", user=
 
 
 @router.post("")
-async def create_task(data: TaskCreate, user=Depends(role_required("director", "manager"))):
+def create_task(data: TaskCreate, user=Depends(role_required("director", "manager"))):
     if data.type not in ("daily", "weekly"):
         raise HTTPException(status_code=400, detail="Тип задачи: daily или weekly")
     db = get_db()
@@ -78,7 +78,7 @@ async def create_task(data: TaskCreate, user=Depends(role_required("director", "
 
 
 @router.patch("/{task_id}/done")
-async def toggle_task(task_id: int, user=Depends(get_current_user)):
+def toggle_task(task_id: int, user=Depends(get_current_user)):
     db = get_db()
     task = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not task:
@@ -99,7 +99,7 @@ async def toggle_task(task_id: int, user=Depends(get_current_user)):
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: int, user=Depends(role_required("director", "manager"))):
+def delete_task(task_id: int, user=Depends(role_required("director", "manager"))):
     db = get_db()
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     db.commit()

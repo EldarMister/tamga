@@ -29,7 +29,7 @@ class SelfUpdate(BaseModel):
 
 
 @router.get("")
-async def list_users(user=Depends(role_required("director", "manager"))):
+def list_users(user=Depends(role_required("director", "manager"))):
     db = get_db()
     rows = db.execute("SELECT id, username, full_name, role, phone, is_active, lang, created_at FROM users ORDER BY full_name").fetchall()
     db.close()
@@ -37,7 +37,7 @@ async def list_users(user=Depends(role_required("director", "manager"))):
 
 
 @router.post("")
-async def create_user(data: UserCreate, user=Depends(role_required("director"))):
+def create_user(data: UserCreate, user=Depends(role_required("director"))):
     if data.role not in ALLOWED_ROLES:
         raise HTTPException(status_code=400, detail=f"Недопустимая роль: {data.role}")
     db = get_db()
@@ -60,7 +60,7 @@ async def create_user(data: UserCreate, user=Depends(role_required("director")))
 
 
 @router.put("/{user_id}")
-async def update_user(user_id: int, data: UserUpdate, user=Depends(role_required("director"))):
+def update_user(user_id: int, data: UserUpdate, user=Depends(role_required("director"))):
     db = get_db()
     target = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not target:
@@ -95,7 +95,7 @@ async def update_user(user_id: int, data: UserUpdate, user=Depends(role_required
 
 
 @router.patch("/{user_id}/active")
-async def toggle_active(user_id: int, user=Depends(role_required("director"))):
+def toggle_active(user_id: int, user=Depends(role_required("director"))):
     db = get_db()
     target = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not target:
@@ -109,7 +109,7 @@ async def toggle_active(user_id: int, user=Depends(role_required("director"))):
 
 
 @router.post("/{user_id}/reset-password")
-async def reset_password(user_id: int, user=Depends(role_required("director"))):
+def reset_password(user_id: int, user=Depends(role_required("director"))):
     db = get_db()
     target = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not target:
@@ -123,7 +123,7 @@ async def reset_password(user_id: int, user=Depends(role_required("director"))):
 
 
 @router.patch("/me/lang")
-async def update_my_lang(lang: str, user=Depends(get_current_user)):
+def update_my_lang(lang: str, user=Depends(get_current_user)):
     if lang not in ("ru", "ky"):
         raise HTTPException(status_code=400, detail="Язык должен быть 'ru' или 'ky'")
     db = get_db()
@@ -134,7 +134,7 @@ async def update_my_lang(lang: str, user=Depends(get_current_user)):
 
 
 @router.patch("/me")
-async def update_me(data: SelfUpdate, user=Depends(get_current_user)):
+def update_me(data: SelfUpdate, user=Depends(get_current_user)):
     if user["role"] != "director":
         raise HTTPException(status_code=403, detail="Нет доступа")
 
