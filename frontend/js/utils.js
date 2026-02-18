@@ -43,6 +43,7 @@ export function statusLabel(status) {
         ready: 'Готов',
         closed: 'Закрыт',
         cancelled: 'Отменён',
+        defect: 'Брак',
     };
     const labelsKy = {
         created: 'Түзүлдү',
@@ -54,6 +55,7 @@ export function statusLabel(status) {
         ready: 'Даяр',
         closed: 'Жабык',
         cancelled: 'Жокко чыгарылды',
+        defect: 'Брак',
     };
     const labels = state.lang === 'ky' ? labelsKy : labelsRu;
     return labels[status] || status;
@@ -80,7 +82,7 @@ export function roleLabel(role) {
 
 export function isOverdue(order) {
     if (!order.deadline) return false;
-    if (['ready', 'closed', 'cancelled'].includes(order.status)) return false;
+    if (['ready', 'closed', 'cancelled', 'defect'].includes(order.status)) return false;
     return new Date(order.deadline) < new Date();
 }
 

@@ -11,14 +11,15 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 # Allowed status transitions: {from_status: [(to_status, allowed_roles), ...]}
 TRANSITIONS = {
-    "created": [("design", ("manager", "director")), ("production", ("manager", "director")), ("cancelled", ("manager", "director"))],
-    "design": [("production", ("designer", "manager", "director")), ("cancelled", ("manager", "director"))],
-    "production": [("ready", ("master", "manager", "director")), ("cancelled", ("manager", "director"))],
-    "ready": [("closed", ("manager", "director")), ("cancelled", ("manager", "director"))],
+    "created": [("design", ("manager", "director")), ("production", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "design": [("production", ("designer", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "production": [("ready", ("master", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "ready": [("closed", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
     # Compatibility for legacy statuses
-    "design_done": [("production", ("manager", "director", "master")), ("ready", ("manager", "director")), ("cancelled", ("manager", "director"))],
-    "printed": [("ready", ("manager", "director")), ("cancelled", ("manager", "director"))],
-    "postprocess": [("ready", ("assistant", "manager", "director")), ("cancelled", ("manager", "director"))],
+    "design_done": [("production", ("manager", "director", "master")), ("ready", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "printed": [("ready", ("manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "postprocess": [("ready", ("assistant", "manager", "director")), ("cancelled", ("manager", "director")), ("defect", ("manager", "director"))],
+    "defect": [("cancelled", ("manager", "director"))],
 }
 
 

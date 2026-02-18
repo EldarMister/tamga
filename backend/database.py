@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS orders (
     client_phone        TEXT,
     client_type         TEXT    NOT NULL CHECK(client_type IN ('retail','dealer')),
     status              TEXT    NOT NULL DEFAULT 'created'
-                        CHECK(status IN ('created','design','design_done','production','printed','postprocess','ready','closed','cancelled')),
+                        CHECK(status IN ('created','design','design_done','production','printed','postprocess','ready','closed','cancelled','defect')),
     total_price         REAL    NOT NULL DEFAULT 0,
     material_cost       REAL    NOT NULL DEFAULT 0,
     notes               TEXT,
@@ -463,6 +463,39 @@ def _init_sqlite(conn):
     if "height" not in order_item_cols:
         cur.execute("ALTER TABLE order_items ADD COLUMN height REAL")
 
+    # Migrate orders table to support 'defect' status if needed
+    order_schema_row = cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'").fetchone()
+    if order_schema_row and "'defect'" not in order_schema_row[0]:
+        conn.executescript("""
+            PRAGMA foreign_keys=OFF;
+            ALTER TABLE orders RENAME TO orders_backup;
+            CREATE TABLE orders (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_number        TEXT    NOT NULL UNIQUE,
+                client_name         TEXT    NOT NULL,
+                client_phone        TEXT,
+                client_type         TEXT    NOT NULL CHECK(client_type IN ('retail','dealer')),
+                status              TEXT    NOT NULL DEFAULT 'created'
+                                    CHECK(status IN ('created','design','design_done','production','printed','postprocess','ready','closed','cancelled','defect')),
+                total_price         REAL    NOT NULL DEFAULT 0,
+                material_cost       REAL    NOT NULL DEFAULT 0,
+                notes               TEXT,
+                design_file         TEXT,
+                photo_file          TEXT,
+                assigned_designer   INTEGER REFERENCES users(id),
+                assigned_master     INTEGER REFERENCES users(id),
+                assigned_assistant  INTEGER REFERENCES users(id),
+                deadline            TEXT,
+                created_by          INTEGER NOT NULL REFERENCES users(id),
+                created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+                updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO orders SELECT * FROM orders_backup;
+            DROP TABLE orders_backup;
+            PRAGMA foreign_keys=ON;
+        """)
+        cur = conn.cursor()
+
     shift_count = cur.execute("SELECT COUNT(*) FROM shift_tasks").fetchone()[0]
     if shift_count == 0:
         for role, title, required in SHIFT_TASK_SEED:
@@ -507,6 +540,22 @@ def _init_postgres(conn):
         cur.execute("ALTER TABLE order_items ADD COLUMN width REAL")
     if "height" not in order_item_cols:
         cur.execute("ALTER TABLE order_items ADD COLUMN height REAL")
+
+    # Migrate orders status constraint to support 'defect'
+    cur.execute("""
+        SELECT conname FROM pg_constraint pc
+        JOIN pg_class t ON t.oid = pc.conrelid
+        WHERE t.relname = 'orders' AND pc.contype = 'c'
+        AND pg_get_constraintdef(pc.oid) LIKE '%status%'
+        AND pg_get_constraintdef(pc.oid) NOT LIKE '%defect%'
+    """)
+    old_constraint = cur.fetchone()
+    if old_constraint:
+        cur.execute(f"ALTER TABLE orders DROP CONSTRAINT {old_constraint[0]}")
+        cur.execute("""
+            ALTER TABLE orders ADD CONSTRAINT orders_status_check
+            CHECK(status IN ('created','design','design_done','production','printed','postprocess','ready','closed','cancelled','defect'))
+        """)
 
     cur.execute("SELECT COUNT(*) FROM shift_tasks")
     shift_count = cur.fetchone()[0]

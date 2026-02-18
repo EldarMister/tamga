@@ -2,7 +2,7 @@
 import { state } from '../state.js';
 import { formatCurrency, formatDate, formatDateTime, statusBadgeClass, statusLabel, roleLabel, isOverdue } from '../utils.js';
 import { showToast } from '../components/toast.js';
-import { showModal } from '../components/modal.js';
+import { showModal, showFormModal } from '../components/modal.js';
 
 const NEXT_STATUS = {
     created: { label: 'Передать в дизайн', status: 'design', roles: ['manager', 'director'] },
@@ -37,7 +37,8 @@ function renderOrder(container, order) {
     const overdue = isOverdue(order);
     const next = NEXT_STATUS[order.status];
     const canAdvance = next && next.roles.includes(state.user.role);
-    const canCancel = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled'].includes(order.status);
+    const canCancel = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
+    const canMarkDefect = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
     const canUploadDesign = ['designer', 'manager', 'director'].includes(state.user.role) && ['design', 'created'].includes(order.status);
     const canNotify = ['manager', 'director'].includes(state.user.role) && order.status === 'ready';
 
@@ -178,8 +179,11 @@ function renderOrder(container, order) {
                 </div>
             </div>
 
+            ${canMarkDefect ? `
+                <button class="btn btn-warning btn-block" id="defect-btn">Отметить как Брак</button>
+            ` : ''}
             ${canCancel ? `
-                <button class="btn btn-danger btn-block" id="cancel-btn">Отменить заказ</button>
+                <button class="btn btn-danger btn-block mt-2" id="cancel-btn">Отменить заказ</button>
             ` : ''}
         </div>
     `;
@@ -209,6 +213,25 @@ function renderOrder(container, order) {
                 await api.post(`/api/orders/${order.id}/notify`, {});
                 showToast('Уведомление поставлено в очередь', 'success');
             } catch { /* handled */ }
+        };
+    }
+
+    if (canMarkDefect) {
+        document.getElementById('defect-btn').onclick = () => {
+            showFormModal({
+                title: 'Отметить как Брак',
+                fields: [
+                    { type: 'textarea', name: 'note', label: 'Причина брака', placeholder: 'Опишите причину...' },
+                ],
+                submitText: 'Отметить как Брак',
+                onSubmit: async (data) => {
+                    try {
+                        await api.patch(`/api/orders/${order.id}/status`, { status: 'defect', note: data.note || 'Отмечен как брак' });
+                        showToast('Заказ отмечен как брак', 'warning');
+                        render(container, { id: order.id });
+                    } catch { /* handled */ }
+                },
+            });
         };
     }
 

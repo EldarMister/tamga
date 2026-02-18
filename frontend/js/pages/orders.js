@@ -9,6 +9,7 @@ const STATUS_FILTERS = [
     { value: 'production', label: 'Производство' },
     { value: 'ready', label: 'Готовые' },
     { value: 'closed', label: 'Закрытые' },
+    { value: 'defect', label: 'Брак' },
 ];
 
 let currentFilter = '';
