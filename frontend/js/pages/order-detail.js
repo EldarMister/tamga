@@ -1,6 +1,6 @@
 ﻿import { api } from '../api.js';
 import { state } from '../state.js';
-import { formatCurrency, formatDate, formatDateTime, statusBadgeClass, statusLabel, roleLabel, isOverdue } from '../utils.js';
+import { formatCurrency, formatDate, formatDateTime, statusBadgeClass, statusLabel, roleLabel, isOverdue, buildUploadUrl, openImageViewer } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { showModal, showFormModal } from '../components/modal.js';
 
@@ -41,6 +41,7 @@ function renderOrder(container, order) {
     const canMarkDefect = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
     const canUploadDesign = ['designer', 'manager', 'director'].includes(state.user.role) && ['design', 'created'].includes(order.status);
     const canNotify = ['manager', 'director'].includes(state.user.role) && order.status === 'ready';
+    const photoUrl = buildUploadUrl(order.photo_file);
 
     const items = Array.isArray(order.items) ? order.items : [];
 
@@ -78,10 +79,10 @@ function renderOrder(container, order) {
                 </span>
             </div>
 
-            ${order.photo_file ? `
+            ${photoUrl ? `
                 <div class="card">
                     <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Фото заказа</h3>
-                    <img src="/api/uploads/${order.photo_file}" class="order-photo" alt="Фото заказа">
+                    <img src="${photoUrl}" class="order-photo is-clickable" id="order-photo-image" alt="Фото заказа" loading="lazy">
                 </div>
             ` : ''}
 
@@ -189,6 +190,21 @@ function renderOrder(container, order) {
     `;
 
     document.getElementById('back-btn').onclick = () => { window.location.hash = '#/orders'; };
+
+    const photoEl = document.getElementById('order-photo-image');
+    if (photoEl) {
+        photoEl.addEventListener('error', () => {
+            photoEl.style.display = 'none';
+            const hint = document.createElement('div');
+            hint.className = 'text-gray-400 text-sm';
+            hint.textContent = 'Фото недоступно';
+            photoEl.parentElement.appendChild(hint);
+        }, { once: true });
+
+        photoEl.addEventListener('click', () => {
+            openImageViewer(photoEl.currentSrc || photoEl.src, photoEl.alt || 'Фото заказа');
+        });
+    }
 
     if (canAdvance) {
         document.getElementById('advance-btn').onclick = async () => {

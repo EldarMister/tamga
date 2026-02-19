@@ -1,6 +1,6 @@
 ﻿import { api } from '../api.js';
 import { state } from '../state.js';
-import { formatCurrency, formatDate, statusBadgeClass, statusLabel, isOverdue } from '../utils.js';
+import { formatCurrency, formatDate, statusBadgeClass, statusLabel, isOverdue, buildUploadUrl, openImageViewer } from '../utils.js';
 
 const STATUS_FILTERS = [
     { value: '', label: 'Все' },
@@ -91,6 +91,20 @@ async function loadOrders() {
                 window.location.hash = `#/orders/${card.dataset.id}`;
             };
         });
+
+        list.querySelectorAll('.order-thumb').forEach((img) => {
+            img.addEventListener('error', () => {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'order-thumb-placeholder';
+                img.replaceWith(placeholder);
+            }, { once: true });
+
+            img.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openImageViewer(img.currentSrc || img.src, img.alt || 'Фото заказа');
+            });
+            img.classList.add('is-clickable');
+        });
     } catch {
         list.innerHTML = '<div class="text-center text-red-500 py-8">Ошибка загрузки</div>';
     }
@@ -104,8 +118,9 @@ function renderOrderCard(order) {
         ? `${itemsCount} услуг`
         : (mainItem ? `${mainItem.name_ru} • ${mainItem.quantity} ${mainItem.unit || ''}` : '—');
 
-    const thumb = order.photo_file
-        ? `<img src="/api/uploads/${order.photo_file}" class="order-thumb" alt="Фото">`
+    const photoUrl = buildUploadUrl(order.photo_file);
+    const thumb = photoUrl
+        ? `<img src="${photoUrl}" class="order-thumb" alt="Фото" loading="lazy">`
         : '<div class="order-thumb-placeholder"></div>';
 
     return `

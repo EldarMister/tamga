@@ -93,3 +93,58 @@ export function debounce(fn, ms = 300) {
         timer = setTimeout(() => fn(...args), ms);
     };
 }
+
+export function buildUploadUrl(fileRef) {
+    if (!fileRef || typeof fileRef !== 'string') return '';
+    const normalized = fileRef.trim().replace(/\\/g, '/');
+    if (!normalized) return '';
+
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    if (normalized.startsWith('/api/uploads/')) return normalized;
+    if (normalized.startsWith('api/uploads/')) return `/${normalized}`;
+    if (normalized.startsWith('/')) return normalized;
+
+    const encodedPath = normalized
+        .split('/')
+        .filter(Boolean)
+        .map(part => encodeURIComponent(part))
+        .join('/');
+    return `/api/uploads/${encodedPath}`;
+}
+
+let closeImageViewerFn = null;
+
+export function openImageViewer(src, alt = 'Фото') {
+    if (!src) return;
+    if (typeof closeImageViewerFn === 'function') {
+        closeImageViewerFn();
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'image-viewer-overlay';
+
+    const img = document.createElement('img');
+    img.className = 'image-viewer-img';
+    img.src = src;
+    img.alt = alt;
+    img.addEventListener('click', (e) => e.stopPropagation());
+
+    const onKeyDown = (e) => {
+        if (e.key === 'Escape') close();
+    };
+
+    function close() {
+        overlay.remove();
+        document.removeEventListener('keydown', onKeyDown);
+        if (closeImageViewerFn === close) {
+            closeImageViewerFn = null;
+        }
+    }
+
+    overlay.addEventListener('click', close);
+    overlay.appendChild(img);
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', onKeyDown);
+
+    closeImageViewerFn = close;
+}
