@@ -38,7 +38,7 @@ function renderOrder(container, order) {
     const next = NEXT_STATUS[order.status];
     const canAdvance = next && next.roles.includes(state.user.role);
     const canCancel = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
-    const canMarkDefect = !['closed', 'cancelled', 'defect'].includes(order.status);
+    const canMarkDefect = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
     const canUploadDesign = ['designer', 'manager', 'director'].includes(state.user.role) && ['design', 'created'].includes(order.status);
     const canNotify = ['manager', 'director'].includes(state.user.role) && order.status === 'ready';
 
@@ -221,12 +221,24 @@ function renderOrder(container, order) {
             showFormModal({
                 title: 'Отметить как Брак',
                 fields: [
-                    { type: 'textarea', name: 'note', label: 'Причина брака', placeholder: 'Опишите причину...' },
+                    {
+                        type: 'select',
+                        name: 'caused_by',
+                        label: 'Виновник',
+                        options: [
+                            { value: 'manager', label: 'Менеджер' },
+                            { value: 'designer', label: 'Дизайнер' },
+                            { value: 'master', label: 'Печатник' },
+                        ],
+                    },
+                    { type: 'textarea', name: 'description', label: 'Описание брака', placeholder: 'Опишите проблему...' },
                 ],
                 submitText: 'Отметить как Брак',
                 onSubmit: async (data) => {
                     try {
-                        await api.patch(`/api/orders/${order.id}/status`, { status: 'defect', note: data.note || 'Отмечен как брак' });
+                        const causeLabels = { manager: 'Менеджер', designer: 'Дизайнер', master: 'Печатник' };
+                        const note = `Виновник: ${causeLabels[data.caused_by] || data.caused_by}. ${data.description || ''}`.trim();
+                        await api.patch(`/api/orders/${order.id}/status`, { status: 'defect', note });
                         showToast('Заказ отмечен как брак', 'warning');
                         render(container, { id: order.id });
                     } catch { /* handled */ }
