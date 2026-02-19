@@ -110,11 +110,14 @@ async function loadReport() {
         container.innerHTML = data.items.map(row => `
             <div class="card mb-3">
                 <div class="font-bold mb-2">${row.full_name}</div>
+                <div class="text-xs text-gray-400 mb-2">
+                    Выполнено: ${row.tasks.filter(t => t.completed).length}/${row.tasks.length}
+                </div>
                 <div class="space-y-2">
                     ${row.tasks.map(t => `
                         <div class="flex items-center justify-between text-sm">
                             <span>${t.title}</span>
-                            <span class="${t.completed ? 'text-green-600' : 'text-red-500'}">${t.completed ? 'Выполнено' : 'Нет'}</span>
+                            <span class="${t.completed ? 'text-green-600' : 'text-red-500'}">${t.completed ? 'Выполнено' : 'Не выполнено'}</span>
                         </div>
                     `).join('')}
                 </div>

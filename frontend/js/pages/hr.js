@@ -89,8 +89,13 @@ async function loadMyShift() {
             `;
             document.getElementById('checkout-btn').onclick = async () => {
                 try {
-                    await api.post('/api/hr/checkout');
-                    showToast('Смена завершена!', 'success');
+                    const result = await api.post('/api/hr/checkout');
+                    const summary = result?.shift_tasks_summary;
+                    if (summary && summary.not_completed > 0) {
+                        showToast(`Смена завершена. Выполнено: ${summary.completed}/${summary.total}, не выполнено: ${summary.not_completed}`, 'warning');
+                    } else {
+                        showToast('Смена завершена!', 'success');
+                    }
                     loadMyShift();
                 } catch { /* handled */ }
             };

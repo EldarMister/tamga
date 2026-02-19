@@ -24,6 +24,8 @@ const pageLoaders = {
     '/more': () => import('./pages/more.js'),
     '/tasks': () => import('./pages/tasks.js'),
     '/training': () => import('./pages/training.js'),
+    '/work-journal': () => import('./pages/work-journal.js'),
+    '/leave-requests': () => import('./pages/leave-requests.js'),
 };
 
 const pageCache = {};

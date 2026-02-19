@@ -24,7 +24,6 @@
 
 - `backend/` — API, БД, бизнес-логика
 - `frontend/` — SPA-интерфейс
-- `run.py` — локальный запуск
 - `docker-compose.yml`, `Dockerfile` — запуск в контейнерах
 
 ## Журнал штрафов

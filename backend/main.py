@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from backend.database import init_db
 from backend.seed import seed_db
 from backend.config import UPLOAD_DIR
-from backend.routers import auth_router, orders, pricelist, inventory, hr, payroll, users, reports, tasks, training, announcements
+from backend.routers import auth_router, orders, pricelist, inventory, hr, payroll, users, reports, tasks, training, announcements, work_journal
 import os
 
 
@@ -55,6 +55,7 @@ app.include_router(reports.router)
 app.include_router(tasks.router)
 app.include_router(training.router)
 app.include_router(announcements.router)
+app.include_router(work_journal.router)
 
 # Serve uploaded files
 os.makedirs(UPLOAD_DIR, exist_ok=True)

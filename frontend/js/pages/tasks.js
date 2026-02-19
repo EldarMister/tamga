@@ -64,6 +64,7 @@ async function loadTasks() {
                             ${t.type === 'daily' ? '📅 Дневная' : '📆 Недельная'}
                         </span>
                         <span style="font-size: 12px; color: var(--text-tertiary);">→ ${t.assigned_name}</span>
+                        <span style="font-size: 12px; color: var(--text-tertiary);">Поставил: ${t.assigned_by_name || '—'}</span>
                         ${t.due_date ? `<span style="font-size: 12px; color: var(--text-tertiary);">до ${formatDate(t.due_date)}</span>` : ''}
                     </div>
                 </div>

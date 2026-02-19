@@ -1599,3 +1599,56 @@ select.input {
     border-radius: 12px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
+
+.wj-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    min-width: 980px;
+}
+
+.wj-table th,
+.wj-table td {
+    border-bottom: 1px solid var(--border);
+    padding: 8px 6px;
+    white-space: nowrap;
+}
+
+.wj-user-col {
+    min-width: 170px;
+    text-align: left;
+}
+
+.wj-day-head {
+    min-width: 52px;
+    text-align: center;
+}
+
+.wj-day {
+    text-align: center;
+    border-radius: 8px;
+}
+
+.wj-day-worked {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.wj-day-absent {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.wj-day-leave {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.wj-day-conflict {
+    color: var(--warning);
+    font-weight: 700;
+}
+
+.wj-day-weekend {
+    color: var(--text-tertiary);
+}

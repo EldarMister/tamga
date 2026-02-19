@@ -75,31 +75,39 @@ def checkout(user=Depends(get_current_user)):
         db.close()
         raise HTTPException(status_code=400, detail="Смена уже завершена")
 
-    # Require shift checklist before checkout
-    required = db.execute(
-        "SELECT id, title FROM shift_tasks WHERE role = ? AND is_required = 1",
+    # Do not block checkout: mark all untouched tasks as not completed for reporting.
+    role_tasks = db.execute(
+        "SELECT id FROM shift_tasks WHERE role = ?",
         (user["role"],),
     ).fetchall()
-    if required:
-        done_rows = db.execute(
-            "SELECT task_id FROM shift_task_logs WHERE user_id = ? AND date = ? AND completed = 1",
-            (user["id"], today),
-        ).fetchall()
-        done_ids = {r["task_id"] for r in done_rows}
-        missing = [dict(r) for r in required if r["id"] not in done_ids]
-        if missing:
-            db.close()
-            raise HTTPException(
-                status_code=400,
-                detail={"message": "Отметьте обязательные задачи перед завершением смены", "missing_tasks": missing},
-            )
+    for task in role_tasks:
+        db.execute(
+            """INSERT INTO shift_task_logs (user_id, task_id, date, completed)
+               VALUES (?, ?, ?, 0)
+               ON CONFLICT(user_id, task_id, date) DO NOTHING""",
+            (user["id"], task["id"], today),
+        )
+
+    done_count = db.execute(
+        "SELECT COUNT(*) FROM shift_task_logs WHERE user_id = ? AND date = ? AND completed = 1",
+        (user["id"], today),
+    ).fetchone()[0]
+    total_count = len(role_tasks)
+    not_completed_count = max(total_count - done_count, 0)
+
     db.execute(
         "UPDATE attendance SET check_out = datetime('now') WHERE id = ?", (existing["id"],)
     )
     db.commit()
     row = db.execute("SELECT * FROM attendance WHERE id = ?", (existing["id"],)).fetchone()
     db.close()
-    return dict(row)
+    result = dict(row)
+    result["shift_tasks_summary"] = {
+        "total": total_count,
+        "completed": done_count,
+        "not_completed": not_completed_count,
+    }
+    return result
 
 
 @router.get("/attendance/today")
@@ -193,7 +201,9 @@ def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(get_cu
         )
     else:
         db.execute(
-            "DELETE FROM shift_task_logs WHERE user_id = ? AND task_id = ? AND date = ?",
+            """INSERT INTO shift_task_logs (user_id, task_id, date, completed)
+               VALUES (?, ?, ?, 0)
+               ON CONFLICT(user_id, task_id, date) DO UPDATE SET completed = 0""",
             (user["id"], task_id, today),
         )
 
