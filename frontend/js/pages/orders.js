@@ -120,8 +120,8 @@ function renderOrderCard(order) {
 
     const photoUrl = buildUploadUrl(order.photo_file);
     const thumb = photoUrl
-        ? `<img src="${photoUrl}" class="order-thumb" alt="Фото" loading="lazy">`
-        : '<div class="order-thumb-placeholder"></div>';
+        ? `<img src="${photoUrl}" class="order-thumb" alt="Фото заказа" loading="lazy">`
+        : '<div class="order-thumb-placeholder">📷</div>';
 
     return `
         <div class="card cursor-pointer hover:shadow-md transition-shadow order-card ${overdue ? 'border-red-400 border-2' : ''}" data-id="${order.id}">

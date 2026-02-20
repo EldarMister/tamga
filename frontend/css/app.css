@@ -1546,27 +1546,41 @@ select.input {
 }
 
 .order-thumb {
-    width: 72px;
-    height: 72px;
+    width: 88px;
+    height: 88px;
     object-fit: cover;
     border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--bg-tertiary);
+    transition: opacity 0.15s;
+}
+
+.order-thumb:active {
+    opacity: 0.75;
 }
 
 .order-thumb-placeholder {
-    width: 72px;
-    height: 72px;
+    width: 88px;
+    height: 88px;
     border-radius: 12px;
     border: 1px dashed var(--border);
     background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+    font-size: 24px;
 }
 
 .order-card-grid {
     display: grid;
-    grid-template-columns: 72px 1fr;
-    gap: 12px;
-    align-items: start;
+    grid-template-columns: 88px 1fr;
+    gap: 14px;
+    align-items: center;
+}
+
+.order-card {
+    padding: 14px 16px;
 }
 
 .order-photo {
