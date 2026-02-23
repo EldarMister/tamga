@@ -108,7 +108,7 @@ def list_orders(
 
     # Role-based filtering
     if user["role"] == "designer":
-        conditions.append("o.assigned_designer = ?")
+        conditions.append("(o.assigned_designer = ? OR o.status = 'design')")
         params.append(user["id"])
     elif user["role"] == "master":
         conditions.append("(o.assigned_master = ? OR o.status IN ('design_done', 'production', 'printed'))")

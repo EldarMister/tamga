@@ -96,4 +96,9 @@ export const api = {
     patch: (path, body) => request('PATCH', path, body),
     delete: (path) => request('DELETE', path),
     upload: uploadFile,
+    clearCache: (prefix) => {
+        for (const key of [..._cache.keys()]) {
+            if (!prefix || key.split('?')[0].startsWith(prefix)) _cache.delete(key);
+        }
+    },
 };

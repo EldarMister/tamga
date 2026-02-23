@@ -16,6 +16,7 @@ let currentFilter = '';
 let searchQuery = '';
 
 export async function render(container) {
+    api.clearCache('/api/orders');
     const canCreate = ['director', 'manager'].includes(state.user.role);
 
     container.innerHTML = `
