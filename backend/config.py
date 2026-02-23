@@ -26,5 +26,5 @@ DB_PATH = os.getenv("POLYCONTROL_DB_PATH", os.path.join(BASE_DIR, "polycontrol.d
 DATABASE_URL = os.getenv("POLYCONTROL_DATABASE_URL", "").strip() or os.getenv("DATABASE_URL", "").strip()
 DB_ENGINE = "postgres" if DATABASE_URL.startswith(("postgres://", "postgresql://")) else "sqlite"
 JWT_EXPIRY_HOURS = 72
-UPLOAD_DIR = os.getenv("POLYCONTROL_UPLOAD_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads"))
+UPLOAD_DIR = os.getenv("POLYCONTROL_UPLOAD_DIR", os.path.join(BASE_DIR, "uploads"))
 ALLOWED_ROLES = ("director", "manager", "designer", "master", "assistant")

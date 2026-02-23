@@ -22,6 +22,7 @@ const pageLoaders = {
     '/shift-checklist': () => import('./pages/shift-checklist.js'),
     '/profile': () => import('./pages/profile.js'),
     '/more': () => import('./pages/more.js'),
+    '/calculator': () => import('./pages/calculator.js'),
     '/tasks': () => import('./pages/tasks.js'),
     '/training': () => import('./pages/training.js'),
     '/work-journal': () => import('./pages/work-journal.js'),

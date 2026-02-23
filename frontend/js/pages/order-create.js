@@ -162,6 +162,26 @@ export async function render(container) {
         users = [];
     }
 
+    // Pick up pre-fill from calculator (if any)
+    const prefillRaw = sessionStorage.getItem('calc_prefill');
+    if (prefillRaw) {
+        sessionStorage.removeItem('calc_prefill');
+        try {
+            const pf = JSON.parse(prefillRaw);
+            items = [{
+                id: `calc_${Date.now()}`,
+                service_id: pf.service_id || '',
+                width: pf.width || '',
+                height: pf.height || '',
+                quantity: pf.quantity || '1',
+            }];
+            if (pf.client_type) {
+                const ctSel = document.querySelector('[name="client_type"]');
+                if (ctSel) ctSel.value = pf.client_type;
+            }
+        } catch { /* ignore malformed prefill */ }
+    }
+
     if (items.length === 0) {
         addItem(services[0]?.id || '');
     }

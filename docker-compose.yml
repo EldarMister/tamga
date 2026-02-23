@@ -26,7 +26,7 @@
     environment:
       POLYCONTROL_SECRET: ${POLYCONTROL_SECRET}
       POLYCONTROL_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      POLYCONTROL_UPLOAD_DIR: /data/uploads
+      POLYCONTROL_UPLOAD_DIR: /app/uploads
     volumes:
-      - ./data:/data
+      - ./uploads:/app/uploads
     restart: unless-stopped

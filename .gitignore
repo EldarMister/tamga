@@ -20,6 +20,8 @@ build/
 pgdata/
 data/
 backend/uploads/
+uploads/*
+!uploads/.gitkeep
 
 .vscode/
 .idea/
