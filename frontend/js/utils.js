@@ -83,7 +83,19 @@ export function roleLabel(role) {
 export function isOverdue(order) {
     if (!order.deadline) return false;
     if (['ready', 'closed', 'cancelled', 'defect'].includes(order.status)) return false;
-    return new Date(order.deadline) < new Date();
+    const raw = String(order.deadline).trim();
+    if (!raw) return false;
+
+    // Treat date-only deadlines as end-of-day in local time to avoid timezone false positives.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const [y, m, d] = raw.split('-').map(Number);
+        const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+        return endOfDay < new Date();
+    }
+
+    const deadline = new Date(raw);
+    if (Number.isNaN(deadline.getTime())) return false;
+    return deadline < new Date();
 }
 
 export function debounce(fn, ms = 300) {
@@ -96,12 +108,14 @@ export function debounce(fn, ms = 300) {
 
 export function buildUploadUrl(fileRef) {
     if (!fileRef || typeof fileRef !== 'string') return '';
-    const normalized = fileRef.trim().replace(/\\/g, '/');
+    let normalized = fileRef.trim().replace(/\\/g, '/');
     if (!normalized) return '';
 
     if (/^https?:\/\//i.test(normalized)) return normalized;
     if (normalized.startsWith('/api/uploads/')) return normalized;
     if (normalized.startsWith('api/uploads/')) return `/${normalized}`;
+    if (/^uploads\//i.test(normalized)) normalized = normalized.replace(/^uploads\//i, '');
+    if (/\/uploads\//i.test(normalized)) normalized = normalized.split(/\/uploads\//i).pop() || '';
     if (normalized.startsWith('/')) return normalized;
 
     const encodedPath = normalized

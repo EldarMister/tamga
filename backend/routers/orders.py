@@ -99,8 +99,11 @@ def list_orders(
     params = []
 
     if status:
-        conditions.append("o.status = ?")
-        params.append(status)
+        if status == "closed":
+            conditions.append("o.status IN ('closed','cancelled')")
+        else:
+            conditions.append("o.status = ?")
+            params.append(status)
 
     if search:
         conditions.append("(o.order_number LIKE ? OR o.client_name LIKE ?)")
