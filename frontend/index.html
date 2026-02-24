@@ -3,10 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <!-- PWA: цвет строки состояния / системной темы -->
     <meta name="theme-color" content="#1e40af">
+
+    <!-- PWA: iOS / Safari -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Тамга">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- PWA manifest -->
     <link rel="manifest" href="manifest.json">
+
     <link rel="stylesheet" href="css/app.css">
     <title>Тамга Сервис</title>
 </head>
@@ -23,6 +32,18 @@
     <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
         <div id="modal-content" class="rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto"></div>
     </div>
+
     <script type="module" src="js/app.js"></script>
+
+    <!-- Service Worker — регистрация после загрузки страницы, не блокирует рендер -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(reg => reg.update())
+                    .catch(err => console.warn('SW:', err));
+            });
+        }
+    </script>
 </body>
 </html>
