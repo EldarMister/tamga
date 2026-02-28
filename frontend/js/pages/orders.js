@@ -119,7 +119,7 @@ function renderOrderCard(order) {
         ? `${itemsCount} услуг`
         : (mainItem ? `${mainItem.name_ru} • ${mainItem.quantity} ${mainItem.unit || ''}` : '—');
 
-    const photoUrl = buildUploadUrl(order.photo_file);
+    const photoUrl = order.photo_url || buildUploadUrl(order.photo_file);
     const thumb = photoUrl
         ? `<img src="${photoUrl}" class="order-thumb" alt="Фото заказа" loading="lazy">`
         : '<div class="order-thumb-placeholder">📷</div>';

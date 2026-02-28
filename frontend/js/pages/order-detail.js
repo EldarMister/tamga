@@ -41,7 +41,7 @@ function renderOrder(container, order) {
     const canMarkDefect = ['manager', 'director'].includes(state.user.role) && !['closed', 'cancelled', 'defect'].includes(order.status);
     const canUploadDesign = ['designer', 'manager', 'director'].includes(state.user.role) && ['design', 'created'].includes(order.status);
     const canNotify = ['manager', 'director'].includes(state.user.role) && order.status === 'ready';
-    const photoUrl = buildUploadUrl(order.photo_file);
+    const photoUrl = order.photo_url || buildUploadUrl(order.photo_file);
 
     const items = Array.isArray(order.items) ? order.items : [];
 

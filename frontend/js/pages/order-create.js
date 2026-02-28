@@ -257,12 +257,19 @@ export async function render(container) {
             const result = await api.post('/api/orders', order);
             if (result) {
                 const photoInput = document.getElementById('order-photo');
+                let photoWarning = '';
                 if (photoInput.files[0]) {
                     try {
-                        await api.upload(`/api/orders/${result.id}/photo`, photoInput.files[0]);
-                    } catch { /* ignore */ }
+                        const uploaded = await api.upload(`/api/orders/${result.id}/photo`, photoInput.files[0]);
+                        if (uploaded && uploaded.stored_in_fs === false) {
+                            photoWarning = ' Фото сохранено в резерв, но недоступно в файловой папке.';
+                        }
+                    } catch (uploadErr) {
+                        photoWarning = ` Фото не загрузилось: ${uploadErr?.message || 'ошибка сервера'}.`;
+                    }
                 }
-                showToast(`Заказ ${result.order_number} создан!`, 'success');
+                const msg = `Заказ ${result.order_number} создан!${photoWarning}`;
+                showToast(msg, photoWarning ? 'warning' : 'success');
                 window.location.hash = `#/orders/${result.id}`;
             }
         } catch (err) {

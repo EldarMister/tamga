@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
 from backend.config import UPLOAD_DIR
 import os
 import uuid
+import mimetypes
 from datetime import datetime
+from urllib.parse import quote
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -85,6 +88,50 @@ def _calc_item_total(unit: str, unit_price: float, quantity: float, width: float
     return calc_units * unit_price, calc_units
 
 
+def _order_select_columns(alias: str = "") -> str:
+    p = f"{alias}." if alias else ""
+    return (
+        f"{p}id, {p}order_number, {p}client_name, {p}client_phone, {p}client_type, {p}status, "
+        f"{p}total_price, {p}material_cost, {p}notes, {p}design_file, {p}photo_file, {p}photo_mime, "
+        f"CASE WHEN {p}photo_blob IS NOT NULL THEN 1 ELSE 0 END AS has_photo_blob, "
+        f"{p}assigned_designer, {p}assigned_master, {p}assigned_assistant, {p}deadline, "
+        f"{p}created_by, {p}created_at, {p}updated_at"
+    )
+
+
+def _to_bytes(value) -> bytes | None:
+    if value is None:
+        return None
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    if isinstance(value, memoryview):
+        return value.tobytes()
+    try:
+        return bytes(value)
+    except Exception:
+        return None
+
+
+def _build_photo_url(order_id: int, updated_at: str | None) -> str:
+    if updated_at:
+        return f"/api/orders/{order_id}/photo/raw?v={quote(str(updated_at))}"
+    return f"/api/orders/{order_id}/photo/raw"
+
+
+def _serialize_order_row(row) -> dict:
+    order = dict(row)
+    has_photo_blob = bool(order.get("has_photo_blob")) or bool(order.get("photo_blob"))
+    has_photo = bool((order.get("photo_file") or "").strip()) or has_photo_blob
+    if has_photo:
+        order["photo_url"] = _build_photo_url(order["id"], order.get("updated_at"))
+    else:
+        order["photo_url"] = ""
+    order.pop("photo_blob", None)
+    order.pop("photo_mime", None)
+    order.pop("has_photo_blob", None)
+    return order
+
+
 @router.get("")
 def list_orders(
     status: str = "",
@@ -122,13 +169,13 @@ def list_orders(
 
     where = " AND ".join(conditions)
     rows = db.execute(
-        f"SELECT o.* FROM orders o WHERE {where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?",
+        f"SELECT {_order_select_columns('o')} FROM orders o WHERE {where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?",
         params + [limit, offset],
     ).fetchall()
 
     count = db.execute(f"SELECT COUNT(*) FROM orders o WHERE {where}", params).fetchone()[0]
 
-    orders = [dict(r) for r in rows]
+    orders = [_serialize_order_row(r) for r in rows]
     if orders:
         order_ids = [o["id"] for o in orders]
         placeholders = ",".join(["?"] * len(order_ids))
@@ -151,12 +198,12 @@ def list_orders(
 @router.get("/{order_id}")
 def get_order(order_id: int, user=Depends(get_current_user)):
     db = get_db()
-    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    order = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
         db.close()
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    order = dict(order)
+    order = _serialize_order_row(order)
     items = db.execute(
         "SELECT oi.*, s.name_ru, s.code, s.unit FROM order_items oi JOIN services s ON s.id = oi.service_id WHERE oi.order_id = ?",
         (order_id,),
@@ -174,6 +221,40 @@ def get_order(order_id: int, user=Depends(get_current_user)):
 
     db.close()
     return order
+
+
+@router.get("/{order_id}/photo/raw")
+def get_order_photo_raw(order_id: int):
+    db = get_db()
+    row = db.execute(
+        "SELECT id, photo_file, photo_mime, photo_blob FROM orders WHERE id = ?",
+        (order_id,),
+    ).fetchone()
+    if not row:
+        db.close()
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+
+    order = dict(row)
+    photo_file = (order.get("photo_file") or "").strip()
+    photo_mime = (order.get("photo_mime") or "").strip() or "application/octet-stream"
+
+    if photo_file:
+        filepath = os.path.join(UPLOAD_DIR, photo_file)
+        if os.path.isfile(filepath):
+            db.close()
+            media_type = photo_mime if photo_mime.startswith("image/") else None
+            return FileResponse(filepath, media_type=media_type)
+
+    photo_blob = _to_bytes(order.get("photo_blob"))
+    db.close()
+    if photo_blob:
+        return Response(
+            content=photo_blob,
+            media_type=photo_mime,
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+
+    raise HTTPException(status_code=404, detail="Фото не найдено")
 
 
 @router.post("")
@@ -270,15 +351,15 @@ def create_order(data: OrderCreate, user=Depends(role_required("manager", "direc
     )
 
     db.commit()
-    result = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    result = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
     db.close()
-    return dict(result)
+    return _serialize_order_row(result)
 
 
 @router.patch("/{order_id}/status")
 def update_status(order_id: int, data: StatusUpdate, user=Depends(get_current_user)):
     db = get_db()
-    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    order = db.execute("SELECT id, status FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
         db.close()
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -346,15 +427,15 @@ def update_status(order_id: int, data: StatusUpdate, user=Depends(get_current_us
         )
 
     db.commit()
-    updated = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    updated = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
     db.close()
-    return dict(updated)
+    return _serialize_order_row(updated)
 
 
 @router.post("/{order_id}/notify")
 def notify_client(order_id: int, data: NotifyRequest, user=Depends(role_required("manager", "director"))):
     db = get_db()
-    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    order = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
         db.close()
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -381,7 +462,7 @@ async def upload_design(order_id: int, file: UploadFile = File(...), user=Depend
         raise HTTPException(status_code=403, detail="Нет доступа")
 
     db = get_db()
-    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    order = db.execute("SELECT id FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
         db.close()
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -403,7 +484,7 @@ async def upload_design(order_id: int, file: UploadFile = File(...), user=Depend
 @router.post("/{order_id}/photo")
 async def upload_photo(order_id: int, file: UploadFile = File(...), user=Depends(get_current_user)):
     db = get_db()
-    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    order = db.execute("SELECT id FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
         db.close()
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -412,19 +493,41 @@ async def upload_photo(order_id: int, file: UploadFile = File(...), user=Depends
     filename = f"order_{order_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
     content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
 
-    db.execute("UPDATE orders SET photo_file = ?, updated_at = datetime('now') WHERE id = ?", (filename, order_id))
+    photo_mime = (file.content_type or "").strip().lower()
+    if not photo_mime.startswith("image/"):
+        guessed, _ = mimetypes.guess_type(file.filename or "")
+        if guessed and guessed.startswith("image/"):
+            photo_mime = guessed
+    if not photo_mime:
+        photo_mime = "application/octet-stream"
+
+    stored_filename = None
+    try:
+        with open(filepath, "wb") as f:
+            f.write(content)
+        stored_filename = filename
+    except OSError:
+        stored_filename = None
+
+    db.execute(
+        "UPDATE orders SET photo_file = ?, photo_mime = ?, photo_blob = ?, updated_at = datetime('now') WHERE id = ?",
+        (stored_filename, photo_mime, content, order_id),
+    )
     db.commit()
     db.close()
-    return {"filename": filename}
+    return {
+        "filename": stored_filename,
+        "stored_in_fs": bool(stored_filename),
+        "stored_in_db": True,
+        "url": _build_photo_url(order_id, datetime.now().isoformat()),
+    }
 
 
 @router.put("/{order_id}")
 def update_order(order_id: int, data: dict, user=Depends(role_required("manager", "director"))):
     db = get_db()
-    order = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    order = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
     if not order:
         db.close()
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -433,13 +536,13 @@ def update_order(order_id: int, data: dict, user=Depends(role_required("manager"
     updates = {k: v for k, v in data.items() if k in allowed_fields}
     if not updates:
         db.close()
-        return dict(order)
+        return _serialize_order_row(order)
 
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     values = list(updates.values()) + [order_id]
     db.execute(f"UPDATE orders SET {set_clause}, updated_at = datetime('now') WHERE id = ?", values)
     db.commit()
 
-    updated = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    updated = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
     db.close()
-    return dict(updated)
+    return _serialize_order_row(updated)

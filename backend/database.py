@@ -1,7 +1,9 @@
 ﻿import sqlite3
 from typing import Any, Iterable
+import os
+import mimetypes
 
-from backend.config import DB_ENGINE, DB_PATH, DATABASE_URL
+from backend.config import DB_ENGINE, DB_PATH, DATABASE_URL, UPLOAD_DIR
 
 try:
     import psycopg2
@@ -241,6 +243,8 @@ CREATE TABLE IF NOT EXISTS orders (
     notes               TEXT,
     design_file         TEXT,
     photo_file          TEXT,
+    photo_mime          TEXT,
+    photo_blob          BLOB,
     assigned_designer   INTEGER REFERENCES users(id),
     assigned_master     INTEGER REFERENCES users(id),
     assigned_assistant  INTEGER REFERENCES users(id),
@@ -450,11 +454,73 @@ SHIFT_TASK_SEED = [
 ]
 
 
+def _image_mime_or_default(photo_file: str, existing_mime: str | None) -> str:
+    mime = (existing_mime or "").strip().lower()
+    if mime.startswith("image/"):
+        return mime
+    guessed, _ = mimetypes.guess_type(photo_file or "")
+    if guessed and guessed.startswith("image/"):
+        return guessed
+    return "application/octet-stream"
+
+
+def _backfill_photo_blobs_sqlite(cur) -> None:
+    rows = cur.execute(
+        """
+        SELECT id, photo_file, photo_mime
+        FROM orders
+        WHERE photo_blob IS NULL
+          AND photo_file IS NOT NULL
+          AND TRIM(photo_file) <> ''
+        """
+    ).fetchall()
+    for order_id, photo_file, photo_mime in rows:
+        path = os.path.join(UPLOAD_DIR, photo_file)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "rb") as f:
+                content = f.read()
+        except OSError:
+            continue
+        cur.execute(
+            "UPDATE orders SET photo_blob = ?, photo_mime = ? WHERE id = ?",
+            (content, _image_mime_or_default(photo_file, photo_mime), order_id),
+        )
+
+
+def _backfill_photo_blobs_postgres(cur) -> None:
+    cur.execute(
+        """
+        SELECT id, photo_file, photo_mime
+        FROM orders
+        WHERE photo_blob IS NULL
+          AND photo_file IS NOT NULL
+          AND btrim(photo_file) <> ''
+        """
+    )
+    rows = cur.fetchall()
+    for order_id, photo_file, photo_mime in rows:
+        path = os.path.join(UPLOAD_DIR, photo_file)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "rb") as f:
+                content = f.read()
+        except OSError:
+            continue
+        cur.execute(
+            "UPDATE orders SET photo_blob = %s, photo_mime = %s WHERE id = %s",
+            (content, _image_mime_or_default(photo_file, photo_mime), order_id),
+        )
+
+
 def _sqlite_to_postgres_schema(sql: str) -> str:
     out = sql
     out = out.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
     out = out.replace("(datetime('now'))", "CURRENT_TIMESTAMP")
     out = out.replace("(date('now'))", "CURRENT_DATE")
+    out = out.replace(" BLOB", " BYTEA")
     return out
 
 
@@ -477,6 +543,10 @@ def _init_sqlite(conn):
     order_cols = {r[1] for r in cur.execute("PRAGMA table_info(orders)").fetchall()}
     if "photo_file" not in order_cols:
         cur.execute("ALTER TABLE orders ADD COLUMN photo_file TEXT")
+    if "photo_mime" not in order_cols:
+        cur.execute("ALTER TABLE orders ADD COLUMN photo_mime TEXT")
+    if "photo_blob" not in order_cols:
+        cur.execute("ALTER TABLE orders ADD COLUMN photo_blob BLOB")
 
     order_item_cols = {r[1] for r in cur.execute("PRAGMA table_info(order_items)").fetchall()}
     if "width" not in order_item_cols:
@@ -503,6 +573,8 @@ def _init_sqlite(conn):
                 notes               TEXT,
                 design_file         TEXT,
                 photo_file          TEXT,
+                photo_mime          TEXT,
+                photo_blob          BLOB,
                 assigned_designer   INTEGER REFERENCES users(id),
                 assigned_master     INTEGER REFERENCES users(id),
                 assigned_assistant  INTEGER REFERENCES users(id),
@@ -524,6 +596,8 @@ def _init_sqlite(conn):
                 "INSERT INTO shift_tasks (role, title, is_required) VALUES (?, ?, ?)",
                 (role, title, required),
             )
+
+    _backfill_photo_blobs_sqlite(cur)
 
     conn.commit()
 
@@ -551,6 +625,10 @@ def _init_postgres(conn):
     order_cols = {r[0] for r in cur.fetchall()}
     if "photo_file" not in order_cols:
         cur.execute("ALTER TABLE orders ADD COLUMN photo_file TEXT")
+    if "photo_mime" not in order_cols:
+        cur.execute("ALTER TABLE orders ADD COLUMN photo_mime TEXT")
+    if "photo_blob" not in order_cols:
+        cur.execute("ALTER TABLE orders ADD COLUMN photo_blob BYTEA")
 
     cur.execute(
         """SELECT column_name FROM information_schema.columns
@@ -586,6 +664,8 @@ def _init_postgres(conn):
                 "INSERT INTO shift_tasks (role, title, is_required) VALUES (%s, %s, %s)",
                 (role, title, required),
             )
+
+    _backfill_photo_blobs_postgres(cur)
 
     conn.commit()
 
