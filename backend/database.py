@@ -72,6 +72,13 @@ class DBCompat:
         else:
             args = (params,)
 
+        # psycopg2 requires bytes to be wrapped in Binary() for BYTEA columns
+        if self._engine == "postgres":
+            args = tuple(
+                psycopg2.Binary(v) if isinstance(v, (bytes, bytearray)) else v
+                for v in args
+            )
+
         cur = self._conn.cursor()
         cur.execute(sql, args)
 
@@ -465,18 +472,34 @@ def _image_mime_or_default(photo_file: str, existing_mime: str | None) -> str:
 
 
 def _backfill_photo_blobs_sqlite(cur) -> None:
+    """Read photo files from disk and store them as blobs in the DB.
+    If file is missing but blob already exists — nothing to do.
+    If file is missing and blob is also missing — clear stale photo_file reference.
+    """
     rows = cur.execute(
         """
         SELECT id, photo_file, photo_mime
         FROM orders
-        WHERE photo_blob IS NULL
-          AND photo_file IS NOT NULL
+        WHERE photo_file IS NOT NULL
           AND TRIM(photo_file) <> ''
         """
     ).fetchall()
     for order_id, photo_file, photo_mime in rows:
+        # Check if blob already exists
+        blob_row = cur.execute(
+            "SELECT photo_blob FROM orders WHERE id = ? AND photo_blob IS NOT NULL",
+            (order_id,)
+        ).fetchone()
+        if blob_row:
+            continue  # blob already stored, nothing to do
+
         path = os.path.join(UPLOAD_DIR, photo_file)
         if not os.path.isfile(path):
+            # File is gone (ephemeral FS), clear stale reference so UI doesn't show broken photo
+            cur.execute(
+                "UPDATE orders SET photo_file = NULL WHERE id = ?",
+                (order_id,)
+            )
             continue
         try:
             with open(path, "rb") as f:
@@ -490,28 +513,45 @@ def _backfill_photo_blobs_sqlite(cur) -> None:
 
 
 def _backfill_photo_blobs_postgres(cur) -> None:
+    """Read photo files from disk and store them as blobs in the DB.
+    If file is missing but blob already exists — nothing to do.
+    If file is missing and blob is also missing — clear stale photo_file reference.
+    """
     cur.execute(
         """
         SELECT id, photo_file, photo_mime
         FROM orders
-        WHERE photo_blob IS NULL
-          AND photo_file IS NOT NULL
+        WHERE photo_file IS NOT NULL
           AND btrim(photo_file) <> ''
         """
     )
     rows = cur.fetchall()
     for order_id, photo_file, photo_mime in rows:
+        # Check if blob already exists
+        cur.execute(
+            "SELECT 1 FROM orders WHERE id = %s AND photo_blob IS NOT NULL",
+            (order_id,)
+        )
+        if cur.fetchone():
+            continue  # blob already stored, nothing to do
+
         path = os.path.join(UPLOAD_DIR, photo_file)
         if not os.path.isfile(path):
+            # File is gone (ephemeral FS), clear stale reference so UI doesn't show broken photo
+            cur.execute(
+                "UPDATE orders SET photo_file = NULL WHERE id = %s",
+                (order_id,)
+            )
             continue
         try:
             with open(path, "rb") as f:
                 content = f.read()
         except OSError:
             continue
+        import psycopg2 as _pg
         cur.execute(
             "UPDATE orders SET photo_blob = %s, photo_mime = %s WHERE id = %s",
-            (content, _image_mime_or_default(photo_file, photo_mime), order_id),
+            (_pg.Binary(content), _image_mime_or_default(photo_file, photo_mime), order_id),
         )
 
 
