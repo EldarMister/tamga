@@ -97,6 +97,40 @@ function isOptionAllowedForClient(rawOptions, key, clientType) {
     return meta.client_types.includes(clientType);
 }
 
+function isAreaUnitStable(unit) {
+    if (!unit) return false;
+    const u = String(unit).toLowerCase().replace(/\s+/g, '');
+    const normalized = u
+        .replace(/\u00b2/g, '2')
+        .replace(/\u043c\u00b2/g, '\u043c2')
+        .replace(/\u0432\u00b2/g, '2');
+    return normalized.includes('m2')
+        || normalized.includes('\u043c2')
+        || normalized.includes('mВІ')
+        || normalized.includes('Рј2')
+        || normalized.includes('РјВІ')
+        || isAreaUnit(unit);
+}
+
+function canonicalServiceTypeStable(svc) {
+    const code = String(svc?.code || '').toLowerCase();
+    const category = String(svc?.category || '').toLowerCase();
+    const name = String(svc?.name_ru || '').toLowerCase();
+    const source = `${code} ${category} ${name}`;
+    const has = (...patterns) => patterns.some(p => source.includes(p));
+
+    if (has('banner', '\u0431\u0430\u043d\u043d\u0435\u0440', 'Р±Р°РЅРЅРµСЂ')) return 'banner';
+    if (has('samokley', 'samokle', 'vinyl', '\u0441\u0430\u043c\u043e\u043a\u043b\u0435\u0439', 'СЃР°РјРѕРєР»РµР№')) return 'samokleyka';
+    if (has('setka', 'mesh', '\u0441\u0435\u0442\u043a', 'СЃРµС‚Рє')) return 'setka';
+    if (has('stend', 'stand', 'forex', '\u0441\u0442\u0435\u043d\u0434', 'СЃС‚РµРЅРґ')) return 'stend';
+    if (has('letters', '\u0431\u0443\u043a\u0432', 'Р±СѓРєРІ')) return 'letters';
+    if (has('tablich', 'table', '\u0442\u0430\u0431\u043b\u0438\u0447', 'С‚Р°Р±Р»РёС‡')) return 'tablichka';
+    if (has('menu', '\u043c\u0435\u043d\u044e')) return 'menu';
+    if (has('vizit', 'business_card', '\u0432\u0438\u0437\u0438\u0442', 'РІРёР·РёС‚')) return 'vizitka';
+    if (has('dtf')) return 'dtf';
+    return canonicalServiceType(svc);
+}
+
 // ─── Core calculation ─────────────────────────────────────────────────────────
 function compute() {
     const svc = getService(calc.service_id);
@@ -108,8 +142,8 @@ function compute() {
 
     const options = parseOptions(svc.options);
     const rawOptions = parseOptionsObject(svc.options);
-    const serviceType = canonicalServiceType(svc);
-    const areaUnit = isAreaUnit(svc.unit);
+    const serviceType = canonicalServiceTypeStable(svc);
+    const areaUnit = isAreaUnitStable(svc.unit);
     let unitPrice = defaultUnitPrice;
     let quantity = 0;
     let area = null;
@@ -228,7 +262,7 @@ export async function render(container) {
 // ─── Full re-render (on service / client_type change) ────────────────────────
 function renderCalc(container) {
     const svc = getService(calc.service_id);
-    const area = isAreaUnit(svc?.unit);
+    const area = isAreaUnitStable(svc?.unit);
     const sheet = isSheetUnit(svc?.unit);
     const result = compute();
     const options = result.options || [];
@@ -369,7 +403,7 @@ function renderBreakdown(result, svc, area) {
 // ─── Partial update — only result card, inputs keep focus ────────────────────
 function updateResult() {
     const svc = getService(calc.service_id);
-    const area = isAreaUnit(svc?.unit);
+    const area = isAreaUnitStable(svc?.unit);
     const sheet = isSheetUnit(svc?.unit);
     const result = compute();
 
@@ -396,7 +430,7 @@ function updateResult() {
 // ─── Event handlers ───────────────────────────────────────────────────────────
 function attachHandlers(container) {
     const svc = getService(calc.service_id);
-    const area = isAreaUnit(svc?.unit);
+    const area = isAreaUnitStable(svc?.unit);
 
     // Service change → full re-render
     document.getElementById('calc-service').onchange = (e) => {
