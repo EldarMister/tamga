@@ -53,8 +53,48 @@ function parseOptions(raw) {
     return [];
 }
 
+function parseOptionsObject(raw) {
+    if (!raw) return {};
+    try {
+        const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch {
+        return {};
+    }
+}
+
 function getService(id) {
     return services.find(s => String(s.id) === String(id));
+}
+
+function canonicalServiceType(svc) {
+    const code = String(svc?.code || '').toLowerCase();
+    const category = String(svc?.category || '').toLowerCase();
+    const name = String(svc?.name_ru || '').toLowerCase();
+    const source = `${code} ${category} ${name}`;
+
+    if (source.includes('banner') || source.includes('баннер')) return 'banner';
+    if (source.includes('samokley') || source.includes('vinyl') || source.includes('самоклей')) return 'samokleyka';
+    if (source.includes('setka') || source.includes('mesh') || source.includes('сетк')) return 'setka';
+    if (source.includes('stend') || source.includes('stand') || source.includes('forex') || source.includes('стенд')) return 'stend';
+    if (source.includes('letters') || source.includes('букв')) return 'letters';
+    if (source.includes('tablich') || source.includes('table') || source.includes('таблич')) return 'tablichka';
+    if (source.includes('menu')) return 'menu';
+    if (source.includes('vizit') || source.includes('business_card') || source.includes('визит')) return 'vizitka';
+    if (source.includes('dtf')) return 'dtf';
+    return '';
+}
+
+function isTwoSideKey(key) {
+    const value = String(key || '').toLowerCase();
+    return /(two|2|double|двух|двуст|артын|артынa|артына|артынан)/.test(value);
+}
+
+function isOptionAllowedForClient(rawOptions, key, clientType) {
+    const meta = rawOptions?.[key];
+    if (!meta || typeof meta !== 'object') return true;
+    if (!Array.isArray(meta.client_types) || meta.client_types.length === 0) return true;
+    return meta.client_types.includes(clientType);
 }
 
 // ─── Core calculation ─────────────────────────────────────────────────────────
@@ -62,35 +102,103 @@ function compute() {
     const svc = getService(calc.service_id);
     if (!svc) return { unitPrice: 0, quantity: 0, area: null, baseCost: 0, optionsCost: 0, total: 0, options: [] };
 
-    const unitPrice = (calc.client_type === 'dealer' && svc.price_dealer > 0)
+    const defaultUnitPrice = (calc.client_type === 'dealer' && svc.price_dealer > 0)
         ? svc.price_dealer
         : svc.price_retail;
 
     const options = parseOptions(svc.options);
+    const rawOptions = parseOptionsObject(svc.options);
+    const serviceType = canonicalServiceType(svc);
+    const areaUnit = isAreaUnit(svc.unit);
+    let unitPrice = defaultUnitPrice;
     let quantity = 0;
     let area = null;
     let baseCost = 0;
 
-    if (isAreaUnit(svc.unit)) {
+    if (areaUnit) {
         const w = Math.max(0, parseFloat(calc.width) || 0);
         const h = Math.max(0, parseFloat(calc.height) || 0);
         const copies = Math.max(1, parseInt(calc.copies) || 1);
-        area = Math.round(w * h * 100) / 100;
-        quantity = Math.round(area * copies * 100) / 100;
-        baseCost = quantity * unitPrice;
+        const areaRaw = w * h;
+
+        area = Math.round(areaRaw * 100) / 100;
+        quantity = Math.round(areaRaw * copies * 100) / 100;
+
+        if (calc.client_type === 'dealer') {
+            if (serviceType === 'banner') {
+                unitPrice = 300;
+                baseCost = areaRaw * 300 * copies;
+            } else if (serviceType === 'samokleyka') {
+                unitPrice = 400;
+                baseCost = areaRaw * 400 * copies;
+            } else if (serviceType === 'setka') {
+                unitPrice = 500;
+                baseCost = areaRaw * 500 * copies;
+            } else if (serviceType === 'stend') {
+                unitPrice = 1600;
+                baseCost = areaRaw * 1600 * copies;
+            } else {
+                baseCost = quantity * unitPrice;
+            }
+        } else {
+            if (serviceType === 'banner') {
+                const rate = areaRaw >= 10 ? 400 : 450;
+                const oneItem = (areaRaw > 0 && areaRaw < 1) ? 400 : areaRaw * rate;
+                unitPrice = (areaRaw > 0 && areaRaw < 1) ? 400 : rate;
+                baseCost = oneItem * copies;
+            } else if (serviceType === 'samokleyka') {
+                const rate = areaRaw >= 10 ? 450 : 500;
+                const oneItem = (areaRaw > 0 && areaRaw < 1) ? 400 : areaRaw * rate;
+                unitPrice = (areaRaw > 0 && areaRaw < 1) ? 400 : rate;
+                baseCost = oneItem * copies;
+            } else if (serviceType === 'setka') {
+                const rate = areaRaw >= 10 ? 650 : 700;
+                const oneItem = (areaRaw > 0 && areaRaw < 1) ? 500 : areaRaw * rate;
+                unitPrice = (areaRaw > 0 && areaRaw < 1) ? 500 : rate;
+                baseCost = oneItem * copies;
+            } else if (serviceType === 'stend') {
+                unitPrice = 2000;
+                baseCost = areaRaw * 2000 * copies;
+            } else {
+                baseCost = quantity * unitPrice;
+            }
+        }
     } else {
         quantity = Math.max(0, parseFloat(calc.quantity) || 0);
-        baseCost = quantity * unitPrice;
+
+        if (serviceType === 'dtf') {
+            const twoSide = Object.entries(calc.options || {}).some(([key, checked]) => checked && isTwoSideKey(key));
+            unitPrice = twoSide ? (quantity >= 10 ? 400 : 500) : 350;
+            baseCost = unitPrice * quantity;
+        } else if (serviceType === 'tablichka') {
+            unitPrice = 350;
+            baseCost = unitPrice * quantity;
+        } else if (serviceType === 'menu') {
+            unitPrice = 200;
+            baseCost = unitPrice * quantity;
+        } else if (serviceType === 'vizitka') {
+            const preset = rawOptions?.vizitka_prices || {};
+            const onePrice = Number(preset.one) || 4;
+            const twoPrice = Number(preset.two) || 6;
+            const twoSide = Object.entries(calc.options || {}).some(([key, checked]) => checked && isTwoSideKey(key));
+            unitPrice = twoSide ? twoPrice : onePrice;
+            baseCost = unitPrice * quantity;
+        } else {
+            baseCost = quantity * unitPrice;
+        }
     }
 
     let optionsCost = 0;
     options.forEach(opt => {
-        if (calc.options[opt.key] && opt.price > 0) {
-            optionsCost += opt.price * (quantity || 1);
-        }
+        if (!calc.options[opt.key] || opt.price <= 0) return;
+        if (!isOptionAllowedForClient(rawOptions, opt.key, calc.client_type)) return;
+        if (serviceType === 'dtf' && isTwoSideKey(opt.key)) return;
+        if (serviceType === 'vizitka' && opt.key === 'vizitka_prices') return;
+        optionsCost += opt.price * (quantity > 0 ? quantity : 0);
     });
 
-    return { unitPrice, quantity, area, baseCost, optionsCost, total: baseCost + optionsCost, options, svc };
+    const total = Math.round(baseCost + optionsCost);
+    return { unitPrice, quantity, area, baseCost, optionsCost, total, options, svc };
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
