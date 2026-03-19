@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/announcements", tags=["announcements"])
 
@@ -49,6 +50,13 @@ def create_announcement(data: AnnouncementCreate, user=Depends(role_required("di
     ann_id = cur.lastrowid
     row = db.execute("SELECT * FROM announcements WHERE id = ?", (ann_id,)).fetchone()
     db.commit()
+    publish_event(
+        "announcements.created",
+        channels=["announcements", "dashboard"],
+        cache_prefixes=["/api/announcements"],
+        payload={"announcement_id": ann_id, "message": row["message"]},
+        user_ids=[data.target_user_id] if data.target_user_id else None,
+    )
     db.close()
     return dict(row)
 
@@ -63,5 +71,12 @@ def mark_read(announcement_id: int, user=Depends(get_current_user)):
         (announcement_id, user["id"]),
     )
     db.commit()
+    publish_event(
+        "announcements.read",
+        channels=["announcements"],
+        cache_prefixes=["/api/announcements"],
+        payload={"announcement_id": announcement_id, "user_id": user["id"]},
+        user_ids=[user["id"]],
+    )
     db.close()
     return {"ok": True}

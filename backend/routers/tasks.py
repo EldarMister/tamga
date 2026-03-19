@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -73,6 +74,12 @@ def create_task(data: TaskCreate, user=Depends(role_required("director", "manage
            WHERE t.id = ?""",
         (cur.lastrowid,),
     ).fetchone()
+    publish_event(
+        "tasks.created",
+        channels=["tasks", "dashboard", "work-journal"],
+        cache_prefixes=["/api/tasks", "/api/work-journal"],
+        payload={"task_id": cur.lastrowid, "assigned_to": data.assigned_to},
+    )
     db.close()
     return dict(row)
 
@@ -94,6 +101,12 @@ def toggle_task(task_id: int, user=Depends(get_current_user)):
     done_at = "datetime('now')" if new_done else "NULL"
     db.execute(f"UPDATE tasks SET is_done = ?, done_at = {done_at} WHERE id = ?", (new_done, task_id))
     db.commit()
+    publish_event(
+        "tasks.updated",
+        channels=["tasks", "dashboard", "work-journal"],
+        cache_prefixes=["/api/tasks", "/api/work-journal"],
+        payload={"task_id": task_id, "is_done": new_done, "assigned_to": task["assigned_to"]},
+    )
     db.close()
     return {"id": task_id, "is_done": new_done}
 
@@ -101,7 +114,14 @@ def toggle_task(task_id: int, user=Depends(get_current_user)):
 @router.delete("/{task_id}")
 def delete_task(task_id: int, user=Depends(role_required("director", "manager"))):
     db = get_db()
+    task = db.execute("SELECT id, assigned_to FROM tasks WHERE id = ?", (task_id,)).fetchone()
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     db.commit()
+    publish_event(
+        "tasks.deleted",
+        channels=["tasks", "dashboard", "work-journal"],
+        cache_prefixes=["/api/tasks", "/api/work-journal"],
+        payload={"task_id": task_id, "assigned_to": task["assigned_to"] if task else None},
+    )
     db.close()
     return {"ok": True}

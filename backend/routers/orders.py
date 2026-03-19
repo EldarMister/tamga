@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
 from backend.config import UPLOAD_DIR
+from backend.realtime import publish_event
 import os
 import uuid
 import mimetypes
@@ -352,6 +353,12 @@ def create_order(data: OrderCreate, user=Depends(role_required("manager", "direc
 
     db.commit()
     result = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
+    publish_event(
+        "orders.created",
+        channels=["orders", "dashboard", "inventory", "reports"],
+        cache_prefixes=["/api/orders", "/api/reports", "/api/inventory"],
+        payload={"order_id": order_id, "status": "created"},
+    )
     db.close()
     return _serialize_order_row(result)
 
@@ -428,6 +435,12 @@ def update_status(order_id: int, data: StatusUpdate, user=Depends(get_current_us
 
     db.commit()
     updated = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
+    publish_event(
+        "orders.status_changed",
+        channels=["orders", "dashboard", "inventory", "reports"],
+        cache_prefixes=["/api/orders", "/api/reports", "/api/inventory"],
+        payload={"order_id": order_id, "status": new_status, "previous_status": current},
+    )
     db.close()
     return _serialize_order_row(updated)
 
@@ -477,6 +490,12 @@ async def upload_design(order_id: int, file: UploadFile = File(...), user=Depend
 
     db.execute("UPDATE orders SET design_file = ?, updated_at = datetime('now') WHERE id = ?", (filename, order_id))
     db.commit()
+    publish_event(
+        "orders.design_uploaded",
+        channels=["orders"],
+        cache_prefixes=["/api/orders"],
+        payload={"order_id": order_id},
+    )
     db.close()
     return {"filename": filename}
 
@@ -515,6 +534,12 @@ async def upload_photo(order_id: int, file: UploadFile = File(...), user=Depends
         (stored_filename, photo_mime, content, order_id),
     )
     db.commit()
+    publish_event(
+        "orders.photo_uploaded",
+        channels=["orders"],
+        cache_prefixes=["/api/orders"],
+        payload={"order_id": order_id},
+    )
     db.close()
     return {
         "filename": stored_filename,
@@ -544,5 +569,11 @@ def update_order(order_id: int, data: dict, user=Depends(role_required("manager"
     db.commit()
 
     updated = db.execute(f"SELECT {_order_select_columns()} FROM orders WHERE id = ?", (order_id,)).fetchone()
+    publish_event(
+        "orders.updated",
+        channels=["orders", "dashboard"],
+        cache_prefixes=["/api/orders", "/api/reports"],
+        payload={"order_id": order_id},
+    )
     db.close()
     return _serialize_order_row(updated)

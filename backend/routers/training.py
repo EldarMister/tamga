@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
 from backend.config import UPLOAD_DIR
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/training", tags=["training"])
 
@@ -54,6 +55,12 @@ def create_training(data: TrainingCreate, user=Depends(role_required("director")
     )
     db.commit()
     row = db.execute("SELECT * FROM training WHERE id = ?", (cur.lastrowid,)).fetchone()
+    publish_event(
+        "training.created",
+        channels=["training"],
+        cache_prefixes=["/api/training"],
+        payload={"training_id": cur.lastrowid},
+    )
     db.close()
     return dict(row)
 
@@ -79,6 +86,13 @@ def mark_watched(training_id: int, user=Depends(get_current_user)):
         )
 
     db.commit()
+    publish_event(
+        "training.updated",
+        channels=["training"],
+        cache_prefixes=["/api/training"],
+        payload={"training_id": training_id},
+        user_ids=[user["id"]],
+    )
     db.close()
     return {"ok": True}
 
@@ -89,6 +103,12 @@ def delete_training(training_id: int, user=Depends(role_required("director"))):
     db.execute("DELETE FROM training_progress WHERE training_id = ?", (training_id,))
     db.execute("DELETE FROM training WHERE id = ?", (training_id,))
     db.commit()
+    publish_event(
+        "training.deleted",
+        channels=["training"],
+        cache_prefixes=["/api/training"],
+        payload={"training_id": training_id},
+    )
     db.close()
     return {"ok": True}
 
@@ -111,6 +131,12 @@ async def upload_training_photo(training_id: int, file: UploadFile = File(...), 
 
     db.execute("UPDATE training SET photo_file = ? WHERE id = ?", (filename, training_id))
     db.commit()
+    publish_event(
+        "training.updated",
+        channels=["training"],
+        cache_prefixes=["/api/training"],
+        payload={"training_id": training_id, "photo_file": filename},
+    )
     db.close()
     return {"filename": filename}
 

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
+from backend.realtime import publish_event
 
 router = APIRouter(tags=["work_journal"])
 
@@ -358,6 +359,12 @@ def create_leave_request(data: LeaveRequestCreate, user=Depends(get_current_user
     )
     db.commit()
     rows = _fetch_leave_requests(db, "lr.id = ?", [cur.lastrowid])
+    publish_event(
+        "leave_requests.created",
+        channels=["leave-requests", "work-journal", "dashboard"],
+        cache_prefixes=["/api/leave-requests", "/api/work-journal"],
+        payload={"leave_request_id": cur.lastrowid, "user_id": target_user_id},
+    )
     db.close()
     return rows[0]
 
@@ -446,5 +453,11 @@ def review_leave_request(
     )
     db.commit()
     rows = _fetch_leave_requests(db, "lr.id = ?", [request_id])
+    publish_event(
+        "leave_requests.updated",
+        channels=["leave-requests", "work-journal", "dashboard"],
+        cache_prefixes=["/api/leave-requests", "/api/work-journal"],
+        payload={"leave_request_id": request_id, "status": new_status, "user_id": row["user_id"]},
+    )
     db.close()
     return rows[0]

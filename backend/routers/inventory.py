@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
@@ -70,6 +71,12 @@ def receive_material(material_id: int, data: MaterialAdjust, user=Depends(role_r
     )
     db.commit()
     updated = db.execute("SELECT * FROM materials WHERE id = ?", (material_id,)).fetchone()
+    publish_event(
+        "inventory.updated",
+        channels=["inventory", "dashboard", "reports"],
+        cache_prefixes=["/api/inventory", "/api/reports"],
+        payload={"material_id": material_id},
+    )
     db.close()
     result = dict(updated)
     result["available"] = result["quantity"] - result["reserved"]
@@ -91,6 +98,12 @@ def correct_material(material_id: int, data: MaterialAdjust, user=Depends(role_r
     )
     db.commit()
     updated = db.execute("SELECT * FROM materials WHERE id = ?", (material_id,)).fetchone()
+    publish_event(
+        "inventory.updated",
+        channels=["inventory", "dashboard", "reports"],
+        cache_prefixes=["/api/inventory", "/api/reports"],
+        payload={"material_id": material_id},
+    )
     db.close()
     result = dict(updated)
     result["available"] = result["quantity"] - result["reserved"]

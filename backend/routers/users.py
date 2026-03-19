@@ -4,6 +4,7 @@ from backend.database import get_db
 from backend.auth import hash_password
 from backend.dependencies import role_required, get_current_user
 from backend.config import ALLOWED_ROLES
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -55,6 +56,12 @@ def create_user(data: UserCreate, user=Depends(role_required("director"))):
         "SELECT id, username, full_name, role, phone, is_active, lang, created_at FROM users WHERE id = ?",
         (cur.lastrowid,),
     ).fetchone()
+    publish_event(
+        "users.created",
+        channels=["users"],
+        cache_prefixes=["/api/users"],
+        payload={"user_id": cur.lastrowid},
+    )
     db.close()
     return dict(row)
 
@@ -90,6 +97,12 @@ def update_user(user_id: int, data: UserUpdate, user=Depends(role_required("dire
         "SELECT id, username, full_name, role, phone, is_active, lang, created_at FROM users WHERE id = ?",
         (user_id,),
     ).fetchone()
+    publish_event(
+        "users.updated",
+        channels=["users"],
+        cache_prefixes=["/api/users"],
+        payload={"user_id": user_id},
+    )
     db.close()
     return dict(row)
 
@@ -104,6 +117,12 @@ def toggle_active(user_id: int, user=Depends(role_required("director"))):
     new_status = 0 if target["is_active"] else 1
     db.execute("UPDATE users SET is_active = ? WHERE id = ?", (new_status, user_id))
     db.commit()
+    publish_event(
+        "users.updated",
+        channels=["users"],
+        cache_prefixes=["/api/users"],
+        payload={"user_id": user_id, "is_active": new_status},
+    )
     db.close()
     return {"id": user_id, "is_active": new_status}
 
@@ -118,6 +137,12 @@ def reset_password(user_id: int, user=Depends(role_required("director"))):
     new_pass = "12345"
     db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(new_pass), user_id))
     db.commit()
+    publish_event(
+        "users.updated",
+        channels=["users"],
+        cache_prefixes=["/api/users"],
+        payload={"user_id": user_id},
+    )
     db.close()
     return {"message": f"Пароль сброшен на: {new_pass}"}
 
@@ -129,6 +154,13 @@ def update_my_lang(lang: str, user=Depends(get_current_user)):
     db = get_db()
     db.execute("UPDATE users SET lang = ? WHERE id = ?", (lang, user["id"]))
     db.commit()
+    publish_event(
+        "users.updated",
+        channels=["users", "profile"],
+        cache_prefixes=["/api/users"],
+        payload={"user_id": user["id"], "lang": lang},
+        user_ids=[user["id"]],
+    )
     db.close()
     return {"lang": lang}
 
@@ -175,5 +207,12 @@ def update_me(data: SelfUpdate, user=Depends(get_current_user)):
         "SELECT id, username, full_name, role, phone, is_active, lang, created_at FROM users WHERE id = ?",
         (user["id"],),
     ).fetchone()
+    publish_event(
+        "users.updated",
+        channels=["users", "profile"],
+        cache_prefixes=["/api/users"],
+        payload={"user_id": user["id"]},
+        user_ids=[user["id"]],
+    )
     db.close()
     return dict(row)

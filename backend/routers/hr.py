@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
 from backend.config import UPLOAD_DIR
+from backend.realtime import publish_event
 import os
 import uuid
 from datetime import date
@@ -56,6 +57,12 @@ def checkin(user=Depends(get_current_user)):
         "SELECT * FROM attendance WHERE user_id = ? AND date = ?",
         (user["id"], today),
     ).fetchone()
+    publish_event(
+        "hr.attendance.updated",
+        channels=["hr", "work-journal", "reports"],
+        cache_prefixes=["/api/hr", "/api/work-journal", "/api/reports"],
+        payload={"user_id": user["id"], "date": today, "action": "checkin"},
+    )
     db.close()
     return dict(row)
 
@@ -100,6 +107,12 @@ def checkout(user=Depends(get_current_user)):
     )
     db.commit()
     row = db.execute("SELECT * FROM attendance WHERE id = ?", (existing["id"],)).fetchone()
+    publish_event(
+        "hr.attendance.updated",
+        channels=["hr", "work-journal", "reports"],
+        cache_prefixes=["/api/hr", "/api/work-journal", "/api/reports"],
+        payload={"user_id": user["id"], "date": today, "action": "checkout"},
+    )
     db.close()
     result = dict(row)
     result["shift_tasks_summary"] = {
@@ -208,6 +221,12 @@ def complete_shift_task(task_id: int, data: ShiftTaskUpdate, user=Depends(get_cu
         )
 
     db.commit()
+    publish_event(
+        "hr.shift_tasks.updated",
+        channels=["hr"],
+        cache_prefixes=["/api/hr"],
+        payload={"user_id": user["id"], "task_id": task_id, "completed": data.completed},
+    )
     db.close()
     return {"ok": True}
 
@@ -241,6 +260,12 @@ def create_shift_task(data: ShiftTaskCreate, user=Depends(role_required("directo
     )
     db.commit()
     row = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (cur.lastrowid,)).fetchone()
+    publish_event(
+        "hr.shift_tasks.created",
+        channels=["hr"],
+        cache_prefixes=["/api/hr"],
+        payload={"task_id": cur.lastrowid, "role": data.role},
+    )
     db.close()
     return dict(row)
 
@@ -268,6 +293,12 @@ def update_shift_task(task_id: int, data: ShiftTaskDefUpdate, user=Depends(role_
         db.commit()
 
     updated = db.execute("SELECT * FROM shift_tasks WHERE id = ?", (task_id,)).fetchone()
+    publish_event(
+        "hr.shift_tasks.updated",
+        channels=["hr"],
+        cache_prefixes=["/api/hr"],
+        payload={"task_id": task_id},
+    )
     db.close()
     return dict(updated)
 
@@ -277,6 +308,12 @@ def delete_shift_task(task_id: int, user=Depends(role_required("director"))):
     db = get_db()
     db.execute("DELETE FROM shift_tasks WHERE id = ?", (task_id,))
     db.commit()
+    publish_event(
+        "hr.shift_tasks.deleted",
+        channels=["hr"],
+        cache_prefixes=["/api/hr"],
+        payload={"task_id": task_id},
+    )
     db.close()
     return {"ok": True}
 
@@ -365,6 +402,12 @@ def create_incident(data: IncidentCreate, user=Depends(role_required("director",
 
     db.commit()
     row = db.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
+    publish_event(
+        "hr.incidents.created",
+        channels=["hr", "reports", "inventory"],
+        cache_prefixes=["/api/hr", "/api/reports", "/api/inventory"],
+        payload={"incident_id": incident_id, "user_id": data.user_id, "order_id": data.order_id},
+    )
     db.close()
     return dict(row)
 
@@ -419,6 +462,12 @@ def review_incident(incident_id: int, user=Depends(role_required("director"))):
     db.close()
     if not row:
         raise HTTPException(status_code=404, detail="РРЅС†РёРґРµРЅС‚ РЅРµ РЅР°Р№РґРµРЅ")
+    publish_event(
+        "hr.incidents.updated",
+        channels=["hr", "reports"],
+        cache_prefixes=["/api/hr", "/api/reports"],
+        payload={"incident_id": incident_id, "status": "reviewed"},
+    )
     return dict(row)
 
 
@@ -439,6 +488,12 @@ async def upload_incident_photo(incident_id: int, file: UploadFile = File(...), 
 
     db.execute("UPDATE incidents SET photo = ? WHERE id = ?", (filename, incident_id))
     db.commit()
+    publish_event(
+        "hr.incidents.updated",
+        channels=["hr"],
+        cache_prefixes=["/api/hr"],
+        payload={"incident_id": incident_id, "photo": filename},
+    )
     db.close()
     return {"filename": filename}
 

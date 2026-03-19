@@ -1,0 +1,17 @@
+export const reactPageLoaders = {
+    '/login': () => import('./pages/LoginPage.jsx'),
+    '/dashboard': () => import('./pages/DashboardPage.jsx'),
+    '/hr': () => import('./pages/HrPage.jsx'),
+    '/orders': () => import('./pages/OrdersPage.jsx'),
+    '/orders/new': () => import('./pages/OrderCreatePage.jsx'),
+    '/orders/:id': () => import('./pages/OrderDetailPage.jsx'),
+    '/users': () => import('./pages/UsersPage.jsx'),
+    '/reports': () => import('./pages/ReportsPage.jsx'),
+    '/tasks': () => import('./pages/TasksPage.jsx'),
+    '/training': () => import('./pages/TrainingPage.jsx'),
+    '/work-journal': () => import('./pages/WorkJournalPage.jsx'),
+    '/announcements': () => import('./pages/AnnouncementsPage.jsx'),
+    '/inventory': () => import('./pages/InventoryPage.jsx'),
+    '/profile': () => import('./pages/ProfilePage.jsx'),
+    '/leave-requests': () => import('./pages/LeaveRequestsPage.jsx'),
+};
