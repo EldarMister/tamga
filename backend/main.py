@@ -1,14 +1,30 @@
+import os
 import time
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from backend.database import init_db
-from backend.seed import seed_db
+
 from backend.config import UPLOAD_DIR
-from backend.routers import auth_router, orders, pricelist, inventory, hr, payroll, users, reports, tasks, training, announcements, work_journal, realtime
-import os
+from backend.database import init_db
+from backend.routers import (
+    announcements,
+    auth_router,
+    hr,
+    inventory,
+    orders,
+    payroll,
+    pricelist,
+    realtime,
+    reports,
+    tasks,
+    training,
+    users,
+    work_journal,
+)
+from backend.seed import seed_db
 
 
 @asynccontextmanager
@@ -43,7 +59,6 @@ async def log_request_time(request: Request, call_next):
     return response
 
 
-# API routers
 app.include_router(auth_router.router)
 app.include_router(orders.router)
 app.include_router(pricelist.router)
@@ -58,40 +73,51 @@ app.include_router(announcements.router)
 app.include_router(work_journal.router)
 app.include_router(realtime.router)
 
-# Serve uploaded files
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/api/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Serve frontend: prefer React build when present, otherwise fall back to legacy frontend.
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LEGACY_FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 REACT_FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend-react", "dist")
 
 
-def get_active_frontend_dir() -> str:
-    react_index = os.path.join(REACT_FRONTEND_DIR, "index.html")
-    return REACT_FRONTEND_DIR if os.path.isfile(react_index) else LEGACY_FRONTEND_DIR
+def get_react_index_path() -> str:
+    return os.path.join(REACT_FRONTEND_DIR, "index.html")
+
+
+def react_build_exists() -> bool:
+    return os.path.isfile(get_react_index_path())
+
+
+def missing_frontend_response() -> HTMLResponse:
+    return HTMLResponse(
+        """
+        <html>
+            <head><title>React build not found</title></head>
+            <body style="font-family: sans-serif; padding: 32px;">
+                <h1>React build not found</h1>
+                <p>Run <code>cd frontend-react && npm install && npm run build</code> before starting the backend.</p>
+            </body>
+        </html>
+        """,
+        status_code=503,
+    )
 
 
 @app.get("/")
 async def serve_index():
-    return FileResponse(os.path.join(get_active_frontend_dir(), "index.html"))
+    if not react_build_exists():
+        return missing_frontend_response()
+    return FileResponse(get_react_index_path())
 
 
 @app.get("/{path:path}")
 async def serve_spa(path: str):
-    normalized_path = path.replace("/", os.sep)
-    frontend_dir = get_active_frontend_dir()
+    if not react_build_exists():
+        return missing_frontend_response()
 
-    # Serve actual files from the active frontend first.
-    file_path = os.path.join(frontend_dir, normalized_path)
+    normalized_path = path.replace("/", os.sep)
+    file_path = os.path.join(REACT_FRONTEND_DIR, normalized_path)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
 
-    # While React migration is in progress, reuse legacy assets if they are not in the React build yet.
-    legacy_file_path = os.path.join(LEGACY_FRONTEND_DIR, normalized_path)
-    if frontend_dir != LEGACY_FRONTEND_DIR and os.path.isfile(legacy_file_path):
-        return FileResponse(legacy_file_path)
-
-    # SPA fallback: return index.html for all other routes.
-    return FileResponse(os.path.join(frontend_dir, "index.html"))
+    return FileResponse(get_react_index_path())

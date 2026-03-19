@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import get_current_user, role_required
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/pricelist", tags=["pricelist"])
 
@@ -51,5 +52,11 @@ def update_price(service_id: int, data: PriceUpdate, user=Depends(role_required(
     db.commit()
 
     updated = db.execute("SELECT * FROM services WHERE id = ?", (service_id,)).fetchone()
+    publish_event(
+        "pricelist.updated",
+        channels=["pricelist"],
+        cache_prefixes=["/api/pricelist"],
+        payload={"service_id": service_id},
+    )
     db.close()
     return dict(updated)

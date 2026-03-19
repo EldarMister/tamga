@@ -1,23 +1,27 @@
 import { lazy, startTransition, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@legacy/api.js';
-import { renderTabBar } from '@legacy/components/tab-bar.js';
 import { showToast } from '@legacy/components/toast.js';
 import { loadTranslations } from '@legacy/i18n.js';
 import { loadState, state } from '@legacy/state.js';
+import TabBar from './components/TabBar.jsx';
 import { DEFAULT_ROUTE, useHashRoute } from './hashRouter.js';
-import { legacyPageLoaders } from './legacy/pageLoaders.js';
-import LegacyPageHost from './legacy/LegacyPageHost.jsx';
 import { reactPageLoaders } from './reactPages.js';
 import { connectRealtime } from './realtime.js';
 
 const ROUTE_CHANNELS = {
     '/dashboard': ['orders', 'tasks', 'announcements', 'inventory', 'leave-requests', 'work-journal', 'reports'],
+    '/more': [],
     '/hr': ['hr', 'work-journal', 'reports'],
     '/orders': ['orders'],
     '/orders/:id': ['orders'],
     '/orders/new': ['orders'],
     '/inventory': ['inventory', 'orders'],
+    '/pricelist': ['pricelist'],
+    '/payroll': ['payroll', 'reports'],
     '/reports': ['orders', 'inventory', 'reports', 'users'],
+    '/fines': ['hr', 'reports'],
+    '/shift-checklist': ['hr'],
+    '/calculator': [],
     '/users': ['users'],
     '/announcements': ['announcements'],
     '/profile': ['profile', 'users'],
@@ -62,10 +66,6 @@ export default function App() {
     });
     const [refreshVersion, setRefreshVersion] = useState(0);
 
-    const legacyPageLoader = useMemo(
-        () => legacyPageLoaders[routeInfo.route] || null,
-        [routeInfo.route],
-    );
     const reactPageLoader = useMemo(
         () => reactPageLoaders[routeInfo.route] || null,
         [routeInfo.route],
@@ -117,9 +117,8 @@ export default function App() {
 
     useEffect(() => {
         loadTranslations(session.lang);
-        renderTabBar();
         syncThemeButton();
-    }, [session.lang, session.user, routeInfo.hash]);
+    }, [session.lang, session.user]);
 
     useEffect(() => {
         if (!session.token && routeInfo.route !== '/login') {
@@ -221,12 +220,6 @@ export default function App() {
                     <Suspense fallback={<div className="flex justify-center py-16"><div className="spinner" /></div>}>
                         <ReactPage params={routeInfo.params} routeKey={renderKey} refreshToken={refreshVersion} />
                     </Suspense>
-                ) : legacyPageLoader ? (
-                    <LegacyPageHost
-                        loader={legacyPageLoader}
-                        params={routeInfo.params}
-                        routeKey={renderKey}
-                    />
                 ) : (
                     <div style={{ textAlign: 'center', padding: '64px', color: 'var(--text-tertiary)' }}>
                         Страница не найдена
@@ -234,9 +227,7 @@ export default function App() {
                 )}
             </div>
 
-            <nav id="tab-bar" className="fixed bottom-0 left-0 right-0 z-40 hidden">
-                <div className="max-w-screen-xl mx-auto flex justify-around items-center h-16" />
-            </nav>
+            <TabBar user={session.user} lang={session.lang} currentHash={routeInfo.hash} />
 
             <div id="toast-container" className="fixed top-4 right-4 z-50 flex flex-col gap-2" />
 

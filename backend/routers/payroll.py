@@ -2,6 +2,7 @@
 from pydantic import BaseModel
 from backend.database import get_db
 from backend.dependencies import role_required
+from backend.realtime import publish_event
 
 router = APIRouter(prefix="/api/payroll", tags=["payroll"])
 
@@ -170,6 +171,12 @@ def save_payroll(data: PayrollEntry, user=Depends(role_required("director"))):
 
     db.commit()
     row = db.execute("SELECT * FROM payroll WHERE id = ?", (payroll_id,)).fetchone()
+    publish_event(
+        "payroll.updated",
+        channels=["payroll", "reports"],
+        cache_prefixes=["/api/payroll", "/api/reports"],
+        payload={"payroll_id": payroll_id, "user_id": data.user_id},
+    )
     db.close()
     return dict(row)
 
@@ -184,5 +191,11 @@ def mark_paid(payroll_id: int, user=Depends(role_required("director"))):
     db.execute("UPDATE payroll SET is_paid = 1, paid_at = datetime('now') WHERE id = ?", (payroll_id,))
     db.commit()
     updated = db.execute("SELECT * FROM payroll WHERE id = ?", (payroll_id,)).fetchone()
+    publish_event(
+        "payroll.updated",
+        channels=["payroll", "reports"],
+        cache_prefixes=["/api/payroll", "/api/reports"],
+        payload={"payroll_id": payroll_id, "user_id": updated["user_id"], "is_paid": True},
+    )
     db.close()
     return dict(updated)
